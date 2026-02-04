@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mini Casino (Game)</title>
+  <style>
+    :root { color-scheme: dark; }
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background:#0b0b0f; color:#fff;
+    }
+    .wrap{ max-width:520px; margin:0 auto; padding:18px; }
+    .card{
+      background:#12121a; border:1px solid #1e1e2a;
+      border-radius:18px; padding:16px; box-shadow: 0 8px 30px rgba(0,0,0,.35);
+    }
+    .row{ display:flex; gap:10px; }
+    .row > *{ flex:1; }
+    h1{ font-size:18px; margin:0 0 10px; font-weight:700; }
+    .muted{ color:#a8a8b6; font-size:12px; }
+    .pill{
+      display:flex; justify-content:space-between; align-items:center;
+      background:#0f0f16; border:1px solid #1e1e2a;
+      border-radius:14px; padding:10px 12px; margin:10px 0 14px;
+    }
+    .btn{
+      width:100%; padding:12px 14px; border-radius:14px;
+      border:1px solid #2a2a3a; background:#171724; color:#fff;
+      font-weight:700; cursor:pointer;
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn.primary{ border-color:#3a3a55; background:#1b1b2a; }
+    .grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .tabs{ display:flex; gap:10px; margin:12px 0; }
+    .tab{
+      flex:1; padding:10px 12px; border-radius:14px; cursor:pointer;
+      border:1px solid #2a2a3a; background:#12121a; text-align:center;
+      color:#cfcfe3; font-weight:700;
+    }
+    .tab.active{ background:#1b1b2a; border-color:#3a3a55; color:#fff; }
+    .slots{
+      display:flex; gap:10px; justify-content:center; margin:14px 0 10px;
+    }
+    .reel{
+      width:90px; height:90px; display:grid; place-items:center;
+      background:#0f0f16; border:1px solid #1e1e2a;
+      border-radius:16px; font-size:42px;
+    }
+    .log{
+      margin-top:10px; padding:10px 12px; border-radius:14px;
+      background:#0f0f16; border:1px solid #1e1e2a; font-size:13px;
+      color:#cfcfe3; min-height:38px;
+    }
+    .tiny{ font-size:11px; color:#7f7f92; margin-top:10px; text-align:center; }
+    input{
+      width:100%; padding:12px 12px; border-radius:14px;
+      border:1px solid #2a2a3a; background:#0f0f16; color:#fff;
+      outline:none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>🎰 Mini-Game</h1>
+      <div class="pill">
+        <div>Баланс</div>
+        <div id="balance" style="font-weight:800;">0</div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" id="tabClicker">💸 Заработок</div>
+        <div class="tab" id="tabSlots">🎰 Слоты</div>
+      </div>
+
+      <!-- CLICKER -->
+      <div id="screenClicker">
+        <div class="muted">Тапай кнопку — получай монеты. Можно “прокачать доход”.</div>
+
+        <div class="grid" style="margin-top:12px;">
+          <button class="btn primary" id="tapBtn">💥 Тап (+<span id="perTap">1</span>)</button>
+          <button class="btn" id="upgradeBtn">⬆️ Апгрейд (+1) — <span id="upgradeCost">10</span></button>
+        </div>
+
+        <div class="log" id="clickerLog">Готов.</div>
+      </div>
+
+      <!-- SLOTS -->
+      <div id="screenSlots" style="display:none;">
+        <div class="muted">Классика: 3 барабана. Выигрыш — за совпадения.</div>
+
+        <div style="margin-top:12px;">
+          <div class="row">
+            <input id="bet" type="number" min="1" value="10" />
+          </div>
+          <div class="muted" style="margin-top:6px;">Ставка (игровые монеты)</div>
+        </div>
+
+        <div class="slots">
+          <div class="reel" id="r1">🍒</div>
+          <div class="reel" id="r2">🍋</div>
+          <div class="reel" id="r3">7️⃣</div>
+        </div>
+
+        <button class="btn primary" id="spinBtn">🎲 Крутить</button>
+        <div class="log" id="slotsLog">Готов к спину.</div>
+      </div>
+
+      <div class="tiny">* Это игра. Никаких реальных денег/вывода.</div>
+    </div>
+  </div>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    // --- state ---
+    const LS_KEY = "mini_game_state_v1";
+    const state = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+    state.balance ??= 100;      // стартовый баланс
+    state.perTap ??= 1;
+    state.upgradeCost ??= 10;
+
+    const balanceEl = document.getElementById("balance");
+    const perTapEl = document.getElementById("perTap");
+    const upgradeCostEl = document.getElementById("upgradeCost");
+
+    function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+    function render(){
+      balanceEl.textContent = state.balance.toString();
+      perTapEl.textContent = state.perTap.toString();
+      upgradeCostEl.textContent = state.upgradeCost.toString();
+    }
+
+    // --- Telegram init (не обязательно, но красиво) ---
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.expand();
+      tg.ready();
+    }
+
+    // --- tabs ---
+    const tabClicker = document.getElementById("tabClicker");
+    const tabSlots = document.getElementById("tabSlots");
+    const screenClicker = document.getElementById("screenClicker");
+    const screenSlots = document.getElementById("screenSlots");
+
+    function setTab(which){
+      const clicker = which === "clicker";
+      tabClicker.classList.toggle("active", clicker);
+      tabSlots.classList.toggle("active", !clicker);
+      screenClicker.style.display = clicker ? "" : "none";
+      screenSlots.style.display = clicker ? "none" : "";
+    }
+    tabClicker.onclick = () => setTab("clicker");
+    tabSlots.onclick = () => setTab("slots");
+
+    // --- clicker ---
+    const clickerLog = document.getElementById("clickerLog");
+    document.getElementById("tapBtn").onclick = () => {
+      state.balance += state.perTap;
+      clickerLog.textContent = `+${state.perTap} монет ✅`;
+      save(); render();
+    };
+
+    document.getElementById("upgradeBtn").onclick = () => {
+      if (state.balance < state.upgradeCost) {
+        clickerLog.textContent = `Не хватает монет. Нужно ${state.upgradeCost}.`;
+        return;
+      }
+      state.balance -= state.upgradeCost;
+      state.perTap += 1;
+      state.upgradeCost = Math.floor(state.upgradeCost * 1.6);
+      clickerLog.textContent = `Апгрейд куплен 🔥 Теперь +${state.perTap} за тап.`;
+      save(); render();
+    };
+
+    // --- slots ---
+    const symbols = ["🍒","🍋","🍇","🍉","🔔","7️⃣"];
+    const r1 = document.getElementById("r1");
+    const r2 = document.getElementById("r2");
+    const r3 = document.getElementById("r3");
+    const betEl = document.getElementById("bet");
+    const slotsLog = document.getElementById("slotsLog");
+
+    function randSym(){ return symbols[Math.floor(Math.random()*symbols.length)]; }
+
+    function payout(a,b,c,bet){
+      // простая таблица выплат:
+      // 7️⃣ 7️⃣ 7️⃣ -> x10
+      // любые 3 одинаковых -> x5
+      // любые 2 одинаковых -> x2
+      if (a==="7️⃣" && b==="7️⃣" && c==="7️⃣") return bet * 10;
+      if (a===b && b===c) return bet * 5;
+      if (a===b || b===c || a===c) return bet * 2;
+      return 0;
+    }
+
+    document.getElementById("spinBtn").onclick = () => {
+      const bet = Math.max(1, parseInt(betEl.value || "1", 10));
+      if (state.balance < bet) {
+        slotsLog.textContent = "Не хватает монет на ставку.";
+        return;
+      }
+
+      state.balance -= bet;
+
+      // "анимация" простая
+      let ticks = 0;
+      const t = setInterval(() => {
+        r1.textContent = randSym();
+        r2.textContent = randSym();
+        r3.textContent = randSym();
+        ticks++;
+        if (ticks >= 12) {
+          clearInterval(t);
+          const a=r1.textContent, b=r2.textContent, c=r3.textContent;
+          const win = payout(a,b,c,bet);
+          if (win > 0) {
+            state.balance += win;
+            slotsLog.textContent = `Комбо ${a}${b}${c} — выигрыш +${win} ✅`;
+          } else {
+            slotsLog.textContent = `Комбо ${a}${b}${c} — мимо.`;
+          }
+          save(); render();
+        }
+      }, 70);
+    };
+
+    render();
+  </script>
+</body>
+  </html>
