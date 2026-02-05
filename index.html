@@ -1,0 +1,1116 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mini Game</title>
+
+  <style>
+    :root{
+      color-scheme: dark;
+      --bg0:#05050a;
+      --bg1:#0a0a14;
+      --card: rgba(14,14,24,.62);
+      --card2: rgba(10,10,18,.55);
+      --stroke: rgba(255,255,255,.08);
+      --stroke2: rgba(255,255,255,.12);
+      --text:#fff;
+      --muted:#a8a8c2;
+      --accent:#b28cff;
+      --accent2:#72d6ff;
+      --good:#7cffbf;
+      --bad:#ff6b8a;
+      --shadow: 0 18px 70px rgba(0,0,0,.58);
+      --r: 22px;
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      color:var(--text);
+      min-height:100vh;
+      background:
+        radial-gradient(850px 520px at 10% 10%, rgba(178,140,255,.18), transparent 60%),
+        radial-gradient(820px 500px at 90% 15%, rgba(114,214,255,.14), transparent 62%),
+        radial-gradient(750px 520px at 30% 88%, rgba(255,107,138,.10), transparent 60%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      overflow-x:hidden;
+    }
+
+    /* subtle grain */
+    body::before{
+      content:"";
+      position:fixed; inset:0;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.16'/%3E%3C/svg%3E");
+      opacity:.20;
+      mix-blend-mode: overlay;
+      pointer-events:none;
+    }
+
+    .wrap{ max-width: 650px; margin:0 auto; padding:18px; }
+
+    .top{
+      display:flex; justify-content:space-between; align-items:center;
+      gap:12px;
+      margin-bottom:14px;
+    }
+
+    .brand{ display:flex; align-items:center; gap:12px; user-select:none; }
+
+    .logo{
+      width:40px; height:40px; border-radius:14px;
+      background: linear-gradient(135deg, rgba(178,140,255,.95), rgba(114,214,255,.85));
+      box-shadow: 0 16px 40px rgba(178,140,255,.22);
+      position:relative; overflow:hidden;
+      cursor:pointer; flex: 0 0 auto;
+    }
+    .logo::after{
+      content:"";
+      position:absolute; inset:-60%;
+      background: conic-gradient(from 180deg, transparent, rgba(255,255,255,.16), transparent);
+      animation: spin 6.5s linear infinite;
+      opacity:.55;
+    }
+    @keyframes spin{ to { transform: rotate(360deg);} }
+
+    .title b{ display:block; font-size:15px; letter-spacing:.2px; }
+    .title span{ display:block; font-size:11px; color:var(--muted); margin-top:2px; }
+
+    .statsBar{
+      display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;
+    }
+    .pill{
+      display:flex; align-items:center; gap:10px;
+      padding:10px 12px;
+      border-radius: 18px;
+      border:1px solid var(--stroke);
+      background: rgba(14,14,24,.55);
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+      min-width: 170px;
+    }
+    .spark{
+      width:10px; height:10px; border-radius:999px;
+      background: rgba(114,214,255,.85);
+      box-shadow: 0 0 18px rgba(114,214,255,.35);
+    }
+    .pill .lbl{ font-size:11px; color:var(--muted); }
+    .pill .val{ font-weight:950; font-size:14px; letter-spacing:.2px; }
+    .pill small{ display:block; margin-top:2px; color:#7f7f9b; font-size:10px; }
+
+    .card{
+      border-radius: var(--r);
+      border:1px solid var(--stroke);
+      background: var(--card);
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+
+    .tabs{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap:10px;
+      padding:14px;
+      border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    .tab{
+      padding:12px 12px;
+      border-radius: 16px;
+      border:1px solid var(--stroke);
+      background: rgba(10,10,18,.55);
+      color:#d7d7f1;
+      font-weight:950;
+      text-align:center;
+      cursor:pointer;
+      transition: transform .08s ease, border-color .18s ease, background .18s ease, filter .18s ease;
+      user-select:none;
+    }
+    .tab:active{ transform: translateY(1px) scale(.995); }
+    .tab.active{
+      border-color: rgba(178,140,255,.55);
+      background: linear-gradient(180deg, rgba(178,140,255,.18), rgba(114,214,255,.10));
+      color:#fff;
+      filter: brightness(1.06);
+    }
+
+    .screen{ padding:14px; }
+    .muted{ color:var(--muted); font-size:12px; line-height:1.35; }
+
+    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:12px; }
+    .grid3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:12px; }
+
+    .btn{
+      width:100%;
+      padding:12px 14px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(10,10,18,.60);
+      color:#fff;
+      font-weight:950;
+      cursor:pointer;
+      user-select:none;
+      transition: transform .08s ease, filter .15s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+    .btn:hover{
+      filter: brightness(1.06);
+      border-color: rgba(178,140,255,.33);
+      box-shadow: 0 10px 30px rgba(0,0,0,.22);
+    }
+    .btn:active{ transform: translateY(1px) scale(.995); }
+    .btn.primary{
+      border-color: rgba(114,214,255,.42);
+      background: linear-gradient(135deg, rgba(178,140,255,.22), rgba(114,214,255,.12));
+    }
+    .btn.good{
+      border-color: rgba(124,255,191,.40);
+      background: linear-gradient(135deg, rgba(124,255,191,.14), rgba(10,10,18,.60));
+    }
+    .btn.danger{
+      border-color: rgba(255,107,138,.45);
+      background: linear-gradient(135deg, rgba(255,107,138,.16), rgba(10,10,18,.60));
+    }
+    .btn.small{ padding:10px 12px; border-radius:14px; font-size:12px; }
+
+    .log{
+      margin-top:10px;
+      padding:11px 12px;
+      border-radius:16px;
+      border:1px solid var(--stroke);
+      background: rgba(10,10,18,.55);
+      color:#d7d7f1;
+      font-size:13px;
+      min-height:44px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .dot{
+      width:9px; height:9px; border-radius:999px;
+      background: rgba(178,140,255,.85);
+      box-shadow: 0 0 16px rgba(178,140,255,.30);
+    }
+
+    .slotBox{
+      margin-top:12px;
+      border-radius: 18px;
+      border:1px solid rgba(255,255,255,.06);
+      background: var(--card2);
+      padding:14px;
+    }
+    .row{ display:flex; gap:10px; }
+    input, textarea{
+      width:100%;
+      padding:12px 12px;
+      border-radius:16px;
+      border:1px solid var(--stroke);
+      background: rgba(10,10,18,.55);
+      color:#fff;
+      outline:none;
+      font-weight:800;
+    }
+    input:focus, textarea:focus{ border-color: rgba(178,140,255,.55); }
+
+    .slots{
+      display:flex; gap:10px; justify-content:center;
+      margin:12px 0 10px;
+    }
+    .reel{
+      width:96px; height:96px;
+      border-radius:22px;
+      border:1px solid rgba(255,255,255,.08);
+      background:
+        radial-gradient(90px 70px at 30% 25%, rgba(178,140,255,.20), transparent 60%),
+        radial-gradient(90px 70px at 70% 80%, rgba(114,214,255,.14), transparent 60%),
+        rgba(10,10,18,.60);
+      display:grid; place-items:center;
+      font-size:46px;
+      box-shadow: 0 18px 44px rgba(0,0,0,.38);
+      position:relative; overflow:hidden;
+      transform: translateZ(0);
+    }
+    .reel::after{
+      content:"";
+      position:absolute; inset:-40%;
+      background: conic-gradient(from 180deg, transparent, rgba(255,255,255,.08), transparent);
+      animation: shine 6.2s linear infinite;
+      opacity:.55;
+    }
+    @keyframes shine{ to{ transform: rotate(360deg);} }
+    .shake{ animation: shake .22s ease-in-out 2; }
+    @keyframes shake{
+      0%{ transform: translateX(0); }
+      25%{ transform: translateX(-2px); }
+      50%{ transform: translateX(2px); }
+      75%{ transform: translateX(-1px); }
+      100%{ transform: translateX(0); }
+    }
+
+    .shopGrid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:10px;
+      margin-top:12px;
+    }
+    .shopItem{
+      border:1px solid var(--stroke);
+      background: rgba(10,10,18,.55);
+      border-radius: 18px;
+      padding:12px;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .shopLeft b{ display:block; font-size:13px; letter-spacing:.2px; }
+    .shopLeft small{ display:block; color:var(--muted); font-size:11px; margin-top:4px; line-height:1.35; }
+    .tag{
+      display:inline-flex; align-items:center; gap:6px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(14,14,24,.45);
+      padding:6px 10px;
+      border-radius: 999px;
+      font-weight:900;
+      font-size:11px;
+      color:#fff;
+      margin-top:8px;
+    }
+    .tag.good{ border-color: rgba(124,255,191,.28); }
+    .tag.purple{ border-color: rgba(178,140,255,.28); }
+    .tag.blue{ border-color: rgba(114,214,255,.28); }
+
+    .tiny{ font-size:11px; color:#7f7f9b; margin-top:10px; text-align:center; }
+
+    .toast{
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      padding: 10px 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(14,14,24,.75);
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+      color:#fff;
+      font-weight:950;
+      font-size:13px;
+      opacity:0;
+      pointer-events:none;
+      transition: opacity .18s ease, transform .18s ease;
+      z-index: 999;
+    }
+    .toast.show{ opacity:1; transform: translateX(-50%) translateY(-4px); }
+
+    /* Admin modal */
+    .modalBack{
+      position: fixed; inset:0;
+      background: rgba(0,0,0,.58);
+      display:none;
+      align-items:center; justify-content:center;
+      padding:18px;
+      z-index: 1000;
+    }
+    .modal{
+      width:100%;
+      max-width:620px;
+      border-radius: 22px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(14,14,24,.86);
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .modalHead{
+      padding:14px 14px;
+      display:flex; align-items:center; justify-content:space-between;
+      border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    .modalHead b{ font-size:14px; }
+    .xbtn{
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(10,10,18,.55);
+      color:#fff;
+      border-radius: 12px;
+      padding:8px 10px;
+      cursor:pointer;
+      font-weight:950;
+    }
+    .modalBody{ padding:14px; }
+    textarea{ min-height: 92px; resize: vertical; }
+    .hint{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.08);
+      background: rgba(10,10,18,.55);
+      font-size:12px;
+      color:#d7d7f1;
+      line-height:1.35;
+    }
+
+    .winGlow{
+      box-shadow: 0 0 0 1px rgba(124,255,191,.25), 0 0 42px rgba(124,255,191,.18), 0 18px 44px rgba(0,0,0,.38);
+      border-color: rgba(124,255,191,.28) !important;
+      animation: pop .25s ease-out 1;
+    }
+    @keyframes pop{
+      0%{ transform: scale(.985); }
+      100%{ transform: scale(1); }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">
+        <div class="logo" id="logo" title="удерживай для админки"></div>
+        <div class="title">
+          <b>Mini Game</b>
+          <span>кликер + слоты + магазин • чисто фан</span>
+        </div>
+      </div>
+
+      <div class="statsBar">
+        <div class="pill" title="Твои монеты">
+          <div class="spark"></div>
+          <div>
+            <div class="lbl">Баланс</div>
+            <div class="val" id="balance">0</div>
+            <small id="passiveLine">+0 / мин (пассив)</small>
+          </div>
+        </div>
+
+        <div class="pill" title="Твои активы">
+          <div class="spark" style="background:rgba(178,140,255,.85); box-shadow:0 0 18px rgba(178,140,255,.35)"></div>
+          <div>
+            <div class="lbl">Активы</div>
+            <div class="val" id="assetsLine">Дом: 0 • Бизнес: 0</div>
+            <small id="luckLine">Удача: 0%</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <div class="tab active" id="tabClicker">💸 Заработок</div>
+        <div class="tab" id="tabSlots">🎰 Слоты</div>
+        <div class="tab" id="tabShop">🛒 Магазин</div>
+      </div>
+
+      <!-- CLICKER -->
+      <div class="screen" id="screenClicker">
+        <div class="muted">
+          Тапай — получай монеты. Апгрейды увеличивают доход.  
+          Пассивный доход идёт с домов/бизнесов (в магазине).
+        </div>
+
+        <div class="grid2">
+          <button class="btn primary" id="tapBtn">💥 Тап (+<span id="perTap">1</span>)</button>
+          <button class="btn" id="upgradeBtn">⬆️ Апгрейд (+1) — <span id="upgradeCost">10</span></button>
+        </div>
+
+        <div class="grid2">
+          <button class="btn good" id="dailyBtn">🎁 Ежедневный бонус</button>
+          <button class="btn" id="statsBtn">📊 Статистика</button>
+        </div>
+
+        <div class="log" id="clickerLog"><span class="dot"></span><span>Готов.</span></div>
+        <div class="tiny">* Всё сохраняется локально в браузере.</div>
+      </div>
+
+      <!-- SLOTS -->
+      <div class="screen" id="screenSlots" style="display:none;">
+        <div class="muted">
+          Классика: 3 барабана. Пары/тройки дают выигрыш, 7️⃣ — топ.  
+          Удачу можно менять в админке (локально).
+        </div>
+
+        <div class="slotBox">
+          <div class="row">
+            <input id="bet" type="number" min="1" value="10" />
+          </div>
+          <div class="muted" style="margin-top:6px;">Ставка (игровые монеты)</div>
+
+          <div class="slots">
+            <div class="reel" id="r1">🍒</div>
+            <div class="reel" id="r2">🍋</div>
+            <div class="reel" id="r3">7️⃣</div>
+          </div>
+
+          <div class="grid2">
+            <button class="btn primary" id="spinBtn">🎲 Крутить</button>
+            <button class="btn" id="autoBtn">⚡ Авто x10</button>
+          </div>
+
+          <div class="log" id="slotsLog"><span class="dot"></span><span>Готов к спину.</span></div>
+        </div>
+
+        <div class="tiny">* Это игра. Никаких реальных денег/вывода.</div>
+      </div>
+
+      <!-- SHOP -->
+      <div class="screen" id="screenShop" style="display:none;">
+        <div class="muted">
+          Тут ты тратишь монеты: прокачки, дома и бизнесы дают пассивный доход.  
+          Хочешь “империю” — собирай активы.
+        </div>
+
+        <div class="shopGrid" id="shopGrid"></div>
+
+        <div class="hint" style="margin-top:10px;">
+          <b>Как работает пассив:</b><br/>
+          • Дом даёт фикс доход/мин<br/>
+          • Бизнес даёт больше, но стоит дороже<br/>
+          • Можно апать уровни (X2/X3 и т.д.)
+        </div>
+
+        <div class="tiny">* Пассив начисляется раз в секунду (плавно).</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Ок</div>
+
+  <!-- Admin Modal -->
+  <div class="modalBack" id="modalBack">
+    <div class="modal">
+      <div class="modalHead">
+        <b>🛡 Админ-меню</b>
+        <button class="xbtn" id="closeModal">✕</button>
+      </div>
+      <div class="modalBody">
+        <div class="muted">
+          Локальная админка только для тебя: баланс / удача / сохранение.
+        </div>
+
+        <div class="grid2" style="margin-top:10px;">
+          <div>
+            <div class="muted" style="margin:0 0 6px;">Установить баланс</div>
+            <input id="setBalance" type="number" min="0" placeholder="например 9999" />
+            <button class="btn" style="margin-top:10px;" id="setBalanceBtn">✅ Применить</button>
+          </div>
+
+          <div>
+            <div class="muted" style="margin:0 0 6px;">Подкрутить удачу</div>
+            <input id="luck" type="number" min="0" max="80" placeholder="0..80 (в %)" />
+            <button class="btn" style="margin-top:10px;" id="luckBtn">🍀 Установить</button>
+          </div>
+        </div>
+
+        <div class="grid3">
+          <button class="btn" id="give1000">💸 +1000</button>
+          <button class="btn" id="give10000">💸 +10000</button>
+          <button class="btn danger" id="resetBtn">🧨 Сброс</button>
+        </div>
+
+        <div class="hint">
+          <b>Экспорт / импорт</b><br/>
+          Сохрани прогресс текстом и верни потом.
+        </div>
+
+        <div style="margin-top:10px;">
+          <textarea id="saveBox" placeholder="тут появится сохранение..."></textarea>
+        </div>
+
+        <div class="grid2" style="margin-top:10px;">
+          <button class="btn" id="exportBtn">📤 Экспорт</button>
+          <button class="btn" id="importBtn">📥 Импорт</button>
+        </div>
+
+        <div class="tiny" id="adminInfo"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================
+    // CONFIG / STATE
+    // =========================
+    const LS_KEY = "mini_game_full_v1";
+    const ADMIN_PASS = "74739";
+
+    const $ = (id) => document.getElementById(id);
+    const toastEl = $("toast");
+
+    function toast(msg){
+      toastEl.textContent = msg;
+      toastEl.classList.add("show");
+      setTimeout(()=> toastEl.classList.remove("show"), 1400);
+    }
+
+    const state = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+
+    // base economy
+    state.balance ??= 100;
+    state.perTap ??= 1;
+    state.upgradeCost ??= 10;
+
+    // slots
+    state.luckBoost ??= 0; // 0..80 (%)
+    state.spins ??= 0;
+    state.wins ??= 0;
+    state.totalWon ??= 0;
+
+    // assets
+    state.houseLevel ??= 0;     // 0..∞
+    state.businessLevel ??= 0;  // 0..∞
+    state.incomeMult ??= 1;     // passive multiplier
+    state.clickMult ??= 1;      // click multiplier
+
+    // daily
+    state.dailyLast ??= 0; // timestamp
+
+    function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+
+    // =========================
+    // derived values
+    // =========================
+    function houseIncomePerMin(level){
+      // мягкий рост: 0, 6, 14, 24, 36, 50...
+      // формула: 4*lvl + lvl^2 + 1
+      if (level <= 0) return 0;
+      return Math.floor(4*level + level*level + 1);
+    }
+    function businessIncomePerMin(level){
+      // сильнее: 0, 18, 40, 66, 96...
+      // формула: 10*lvl + 2*lvl^2 + 6
+      if (level <= 0) return 0;
+      return Math.floor(10*level + 2*level*level + 6);
+    }
+    function passivePerMin(){
+      const base = houseIncomePerMin(state.houseLevel) + businessIncomePerMin(state.businessLevel);
+      return Math.floor(base * state.incomeMult);
+    }
+    function perTap(){
+      return Math.floor(state.perTap * state.clickMult);
+    }
+
+    function fmt(n){
+      n = Math.floor(Number(n) || 0);
+      return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    }
+
+    function renderHeader(){
+      $("balance").textContent = fmt(state.balance);
+      $("perTap").textContent = fmt(perTap());
+      $("upgradeCost").textContent = fmt(state.upgradeCost);
+      $("assetsLine").textContent = `Дом: ${state.houseLevel} • Бизнес: ${state.businessLevel}`;
+      $("luckLine").textContent = `Удача: ${state.luckBoost}%`;
+      $("passiveLine").textContent = `+${fmt(passivePerMin())} / мин (пассив)`;
+      $("adminInfo").textContent =
+        `luckBoost: ${state.luckBoost}% • passive: +${fmt(passivePerMin())}/мин • clickMult: x${state.clickMult} • incomeMult: x${state.incomeMult}`;
+    }
+
+    // =========================
+    // TABS
+    // =========================
+    function setTab(which){
+      const isClicker = which === "clicker";
+      const isSlots = which === "slots";
+      const isShop = which === "shop";
+
+      $("tabClicker").classList.toggle("active", isClicker);
+      $("tabSlots").classList.toggle("active", isSlots);
+      $("tabShop").classList.toggle("active", isShop);
+
+      $("screenClicker").style.display = isClicker ? "" : "none";
+      $("screenSlots").style.display = isSlots ? "" : "none";
+      $("screenShop").style.display = isShop ? "" : "none";
+    }
+    $("tabClicker").onclick = () => setTab("clicker");
+    $("tabSlots").onclick = () => setTab("slots");
+    $("tabShop").onclick = () => { setTab("shop"); renderShop(); };
+
+    // =========================
+    // CLICKER
+    // =========================
+    const clickerLog = $("clickerLog");
+
+    $("tapBtn").onclick = () => {
+      const gain = perTap();
+      state.balance += gain;
+      clickerLog.querySelector("span:last-child").textContent = `+${fmt(gain)} монет ✅`;
+      save(); renderHeader();
+      if (navigator.vibrate) navigator.vibrate(12);
+    };
+
+    $("upgradeBtn").onclick = () => {
+      if (state.balance < state.upgradeCost) {
+        clickerLog.querySelector("span:last-child").textContent = `Не хватает. Нужно ${fmt(state.upgradeCost)}.`;
+        toast("Не хватает монет");
+        return;
+      }
+      state.balance -= state.upgradeCost;
+      state.perTap += 1;
+      state.upgradeCost = Math.floor(state.upgradeCost * 1.6);
+      clickerLog.querySelector("span:last-child").textContent = `Апгрейд 🔥 Теперь +${fmt(perTap())}.`;
+      save(); renderHeader();
+      toast("Апгрейд куплен");
+    };
+
+    $("dailyBtn").onclick = () => {
+      const now = Date.now();
+      const day = 24*60*60*1000;
+      if (now - state.dailyLast < day) {
+        const left = Math.ceil((day - (now - state.dailyLast)) / (60*1000));
+        toast(`Рано. Осталось ~${left} мин`);
+        clickerLog.querySelector("span:last-child").textContent = `Ещё рано. Осталось ~${left} мин.`;
+        return;
+      }
+      // бонус зависит от активов
+      const bonus = 200 + passivePerMin()*2 + perTap()*30;
+      state.balance += bonus;
+      state.dailyLast = now;
+      save(); renderHeader();
+      toast(`+${fmt(bonus)}`);
+      clickerLog.querySelector("span:last-child").textContent = `Ежедневный бонус +${fmt(bonus)} ✅`;
+    };
+
+    $("statsBtn").onclick = () => {
+      const msg =
+        `Спины: ${state.spins}\n` +
+        `Выигрыши: ${state.wins}\n` +
+        `Всего выиграно: ${fmt(state.totalWon)}\n` +
+        `Пассив: +${fmt(passivePerMin())}/мин\n` +
+        `Клик: +${fmt(perTap())}/тап`;
+      toast("Статы");
+      clickerLog.querySelector("span:last-child").textContent = msg;
+    };
+
+    // =========================
+    // SLOTS
+    // =========================
+    const symbols = ["🍒","🍋","🍇","🍉","🔔","7️⃣"];
+    const r1 = $("r1"), r2 = $("r2"), r3 = $("r3");
+    const slotsLog = $("slotsLog");
+    const betEl = $("bet");
+
+    function randSym(){ return symbols[Math.floor(Math.random()*symbols.length)]; }
+
+    function payout(a,b,c,bet){
+      // выплаты:
+      // 7️⃣7️⃣7️⃣ -> x12
+      // любые 3 одинаковых -> x6
+      // любые 2 одинаковых -> x2
+      if (a==="7️⃣" && b==="7️⃣" && c==="7️⃣") return bet * 12;
+      if (a===b && b===c) return bet * 6;
+      if (a===b || b===c || a===c) return bet * 2;
+      return 0;
+    }
+
+    function biasedSpin(){
+      const luck = Math.max(0, Math.min(80, state.luckBoost|0));
+      const roll = Math.random() * 100;
+      const a = randSym();
+      if (roll < luck) {
+        const b = a;
+        const c = (Math.random() < 0.35) ? a : randSym();
+        return [a,b,c];
+      }
+      return [a, randSym(), randSym()];
+    }
+
+    function clearWinGlow(){
+      [r1,r2,r3].forEach(x=>x.classList.remove("winGlow"));
+    }
+    function winGlow(){
+      [r1,r2,r3].forEach(x=>x.classList.add("winGlow"));
+      setTimeout(clearWinGlow, 500);
+    }
+    function shakeReels(){
+      [r1,r2,r3].forEach(x=>x.classList.add("shake"));
+      setTimeout(()=>[r1,r2,r3].forEach(x=>x.classList.remove("shake")), 360);
+    }
+
+    function doSpin(){
+      const bet = Math.max(1, parseInt(betEl.value || "1", 10));
+      if (state.balance < bet) {
+        slotsLog.querySelector("span:last-child").textContent = "Не хватает монет на ставку.";
+        toast("Не хватает монет");
+        shakeReels();
+        return false;
+      }
+
+      state.balance -= bet;
+      state.spins += 1;
+      save(); renderHeader();
+
+      shakeReels();
+      if (navigator.vibrate) navigator.vibrate([10, 20, 10]);
+
+      clearWinGlow();
+
+      let ticks = 0;
+      const t = setInterval(() => {
+        r1.textContent = randSym();
+        r2.textContent = randSym();
+        r3.textContent = randSym();
+        ticks++;
+        if (ticks >= 14) {
+          clearInterval(t);
+          const [a,b,c] = biasedSpin();
+          r1.textContent = a; r2.textContent = b; r3.textContent = c;
+
+          const win = payout(a,b,c,bet);
+          if (win > 0) {
+            state.balance += win;
+            state.wins += 1;
+            state.totalWon += win;
+            slotsLog.querySelector("span:last-child").textContent = `${a}${b}${c} — выигрыш +${fmt(win)} ✅`;
+            toast(`+${fmt(win)}`);
+            winGlow();
+          } else {
+            slotsLog.querySelector("span:last-child").textContent = `${a}${b}${c} — мимо.`;
+          }
+          save(); renderHeader();
+        }
+      }, 65);
+
+      return true;
+    }
+
+    $("spinBtn").onclick = () => doSpin();
+
+    $("autoBtn").onclick = async () => {
+      // авто 10 спинов с паузой
+      let ok = true;
+      for (let i=0;i<10;i++){
+        ok = doSpin();
+        if (!ok) break;
+        await new Promise(res => setTimeout(res, 1050));
+      }
+    };
+
+    // =========================
+    // SHOP SYSTEM
+    // =========================
+    function costHouseNext(level){
+      // дом дороже с уровнем
+      return Math.floor(600 + level*level*220 + level*260);
+    }
+    function costBusinessNext(level){
+      return Math.floor(1800 + level*level*520 + level*480);
+    }
+    function costIncomeMultNext(mult){
+      // x1 -> x2 -> x3...
+      return Math.floor(3500 * mult * 1.25);
+    }
+    function costClickMultNext(mult){
+      return Math.floor(3000 * mult * 1.15);
+    }
+
+    function buy(cost){
+      if (state.balance < cost) { toast("Не хватает"); return false; }
+      state.balance -= cost;
+      return true;
+    }
+
+    function shopItemHtml({id, title, desc, tag, tagClass, price, actionLabel}){
+      return `
+        <div class="shopItem">
+          <div class="shopLeft">
+            <b>${title}</b>
+            <small>${desc}</small>
+            <div class="tag ${tagClass}">💳 ${fmt(price)} • ${tag}</div>
+          </div>
+          <div style="min-width:150px;">
+            <button class="btn primary small" data-buy="${id}">${actionLabel}</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderShop(){
+      const items = [];
+
+      // Дом
+      const hCost = costHouseNext(state.houseLevel);
+      items.push({
+        id:"house",
+        title:`🏠 Дом • уровень ${state.houseLevel}`,
+        desc:`Пассив: +${fmt(houseIncomePerMin(state.houseLevel))}/мин → +${fmt(houseIncomePerMin(state.houseLevel+1))}/мин`,
+        tag:`пассив`,
+        tagClass:"good",
+        price:hCost,
+        actionLabel:"Купить/Апнуть"
+      });
+
+      // Бизнес
+      const bCost = costBusinessNext(state.businessLevel);
+      items.push({
+        id:"biz",
+        title:`🏢 Бизнес • уровень ${state.businessLevel}`,
+        desc:`Пассив: +${fmt(businessIncomePerMin(state.businessLevel))}/мин → +${fmt(businessIncomePerMin(state.businessLevel+1))}/мин`,
+        tag:`пассив`,
+        tagClass:"good",
+        price:bCost,
+        actionLabel:"Купить/Апнуть"
+      });
+
+      // Множитель пассива
+      const imCost = costIncomeMultNext(state.incomeMult);
+      items.push({
+        id:"incomeMult",
+        title:`📈 Улучшение пассива • x${state.incomeMult}`,
+        desc:`Увеличивает общий пассивный доход: x${state.incomeMult} → x${state.incomeMult+1}`,
+        tag:`множитель`,
+        tagClass:"blue",
+        price:imCost,
+        actionLabel:"Прокачать"
+      });
+
+      // Множитель клика
+      const cmCost = costClickMultNext(state.clickMult);
+      items.push({
+        id:"clickMult",
+        title:`👆 Усилитель клика • x${state.clickMult}`,
+        desc:`Увеличивает доход за тап: x${state.clickMult} → x${state.clickMult+1}`,
+        tag:`множитель`,
+        tagClass:"purple",
+        price:cmCost,
+        actionLabel:"Прокачать"
+      });
+
+      // Буст “Сейф” (разово)
+      const vaultCost = 2500;
+      items.push({
+        id:"vault",
+        title:`🧊 Сейф (разово)`,
+        desc:`Разовый бонус: +${fmt(3000)} монет. Просто для кайфа.`,
+        tag:`бонус`,
+        tagClass:"purple",
+        price:vaultCost,
+        actionLabel:"Купить"
+      });
+
+      // “Страховка” (уменьшает ставку авто)
+      const insCost = 4200;
+      items.push({
+        id:"insurance",
+        title:`🛡 Страховка`,
+        desc:`Снижает риск: авто-спины ставят максимум 10% баланса (полезно).`,
+        tag:`качество жизни`,
+        tagClass:"blue",
+        price:insCost,
+        actionLabel: state.insurance ? "Уже куплено" : "Купить"
+      });
+
+      const grid = $("shopGrid");
+      grid.innerHTML = items.map(shopItemHtml).join("");
+
+      grid.querySelectorAll("[data-buy]").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const id = btn.getAttribute("data-buy");
+          onBuy(id);
+        });
+      });
+    }
+
+    function onBuy(id){
+      if (id === "house"){
+        const cost = costHouseNext(state.houseLevel);
+        if (!buy(cost)) return;
+        state.houseLevel += 1;
+        toast("Дом улучшен");
+      }
+      else if (id === "biz"){
+        const cost = costBusinessNext(state.businessLevel);
+        if (!buy(cost)) return;
+        state.businessLevel += 1;
+        toast("Бизнес улучшен");
+      }
+      else if (id === "incomeMult"){
+        const cost = costIncomeMultNext(state.incomeMult);
+        if (!buy(cost)) return;
+        state.incomeMult += 1;
+        toast("Пассив x+1");
+      }
+      else if (id === "clickMult"){
+        const cost = costClickMultNext(state.clickMult);
+        if (!buy(cost)) return;
+        state.clickMult += 1;
+        toast("Клик x+1");
+      }
+      else if (id === "vault"){
+        const cost = 2500;
+        if (!buy(cost)) return;
+        state.balance += 3000;
+        toast("+3000");
+      }
+      else if (id === "insurance"){
+        if (state.insurance) { toast("Уже есть"); return; }
+        const cost = 4200;
+        if (!buy(cost)) return;
+        state.insurance = true;
+        toast("Страховка активна");
+      }
+
+      save();
+      renderHeader();
+      renderShop();
+    }
+
+    // insurance effect: if enabled, cap bet on auto
+    const _oldAuto = $("autoBtn").onclick;
+    $("autoBtn").onclick = async () => {
+      if (state.insurance) {
+        // ограничим ставку: 10% баланса, минимум 1
+        const cap = Math.max(1, Math.floor(state.balance * 0.10));
+        const cur = Math.max(1, parseInt(betEl.value || "1", 10));
+        betEl.value = Math.min(cur, cap).toString();
+      }
+      let ok = true;
+      for (let i=0;i<10;i++){
+        ok = doSpin();
+        if (!ok) break;
+        if (state.insurance) {
+          const cap = Math.max(1, Math.floor(state.balance * 0.10));
+          const cur = Math.max(1, parseInt(betEl.value || "1", 10));
+          betEl.value = Math.min(cur, cap).toString();
+        }
+        await new Promise(res => setTimeout(res, 1050));
+      }
+    };
+
+    // =========================
+    // PASSIVE INCOME TICK
+    // =========================
+    let lastTick = Date.now();
+    setInterval(() => {
+      const now = Date.now();
+      const dt = Math.min(5000, now - lastTick); // ms
+      lastTick = now;
+
+      const perMin = passivePerMin();
+      if (perMin <= 0) return;
+
+      // начисляем плавно: (perMin / 60) * seconds
+      const add = (perMin / 60) * (dt / 1000);
+      state._passiveFrac = (state._passiveFrac || 0) + add;
+
+      const whole = Math.floor(state._passiveFrac);
+      if (whole > 0) {
+        state.balance += whole;
+        state._passiveFrac -= whole;
+        save();
+        renderHeader();
+      }
+    }, 1000);
+
+    // =========================
+    // ADMIN (local, for you)
+    // Open: long-press on logo (700ms) -> password
+    // =========================
+    const modalBack = $("modalBack");
+
+    function openAdmin(){
+      const pass = prompt("Админ-пароль:");
+      if (pass !== ADMIN_PASS) {
+        toast("Неверный пароль");
+        return;
+      }
+      modalBack.style.display = "flex";
+      $("saveBox").value = "";
+      renderHeader();
+      toast("Админ открыт");
+    }
+
+    let pressTimer = null;
+    const logo = $("logo");
+
+    const startPress = () => {
+      pressTimer = setTimeout(openAdmin, 700);
+    };
+    const endPress = () => {
+      if (pressTimer) clearTimeout(pressTimer);
+      pressTimer = null;
+    };
+
+    logo.addEventListener("touchstart", startPress, {passive:true});
+    logo.addEventListener("touchend", endPress, {passive:true});
+    logo.addEventListener("mousedown", startPress);
+    logo.addEventListener("mouseup", endPress);
+    logo.addEventListener("mouseleave", endPress);
+
+    $("closeModal").onclick = () => modalBack.style.display = "none";
+    modalBack.onclick = (e) => { if (e.target === modalBack) modalBack.style.display = "none"; };
+
+    $("setBalanceBtn").onclick = () => {
+      const v = parseInt($("setBalance").value || "0", 10);
+      state.balance = Math.max(0, v);
+      save(); renderHeader();
+      toast("Баланс обновлён");
+    };
+
+    $("luckBtn").onclick = () => {
+      const v = parseInt($("luck").value || "0", 10);
+      state.luckBoost = Math.max(0, Math.min(80, v));
+      save(); renderHeader();
+      toast(`Удача: ${state.luckBoost}%`);
+    };
+
+    $("give1000").onclick = () => {
+      state.balance += 1000;
+      save(); renderHeader();
+      toast("+1000");
+    };
+
+    $("give10000").onclick = () => {
+      state.balance += 10000;
+      save(); renderHeader();
+      toast("+10000");
+    };
+
+    $("resetBtn").onclick = () => {
+      localStorage.removeItem(LS_KEY);
+      toast("Сброшено");
+      setTimeout(()=> location.reload(), 450);
+    };
+
+    $("exportBtn").onclick = () => {
+      $("saveBox").value = JSON.stringify(state);
+      toast("Экспорт готов");
+    };
+
+    $("importBtn").onclick = () => {
+      try{
+        const txt = $("saveBox").value.trim();
+        if (!txt) { toast("Вставь сохранение"); return; }
+        const obj = JSON.parse(txt);
+
+        // мягкая валидация
+        state.balance = Math.max(0, parseInt(obj.balance ?? state.balance, 10));
+        state.perTap = Math.max(1, parseInt(obj.perTap ?? state.perTap, 10));
+        state.upgradeCost = Math.max(1, parseInt(obj.upgradeCost ?? state.upgradeCost, 10));
+        state.luckBoost = Math.max(0, Math.min(80, parseInt(obj.luckBoost ?? state.luckBoost, 10)));
+        state.spins = Math.max(0, parseInt(obj.spins ?? state.spins, 10));
+        state.wins = Math.max(0, parseInt(obj.wins ?? state.wins, 10));
+        state.totalWon = Math.max(0, parseInt(obj.totalWon ?? state.totalWon, 10));
+
+        state.houseLevel = Math.max(0, parseInt(obj.houseLevel ?? state.houseLevel, 10));
+        state.businessLevel = Math.max(0, parseInt(obj.businessLevel ?? state.businessLevel, 10));
+        state.incomeMult = Math.max(1, parseInt(obj.incomeMult ?? state.incomeMult, 10));
+        state.clickMult = Math.max(1, parseInt(obj.clickMult ?? state.clickMult, 10));
+        state.insurance = !!(obj.insurance ?? state.insurance);
+        state.dailyLast = Math.max(0, parseInt(obj.dailyLast ?? state.dailyLast, 10));
+
+        save(); renderHeader();
+        toast("Импорт ок");
+        if ($("screenShop").style.display !== "none") renderShop();
+      } catch(e){
+        toast("Неверный формат");
+      }
+    };
+
+    // =========================
+    // INIT
+    // =========================
+    renderHeader();
+    renderShop();
+  </script>
+</body>
+  </html>
