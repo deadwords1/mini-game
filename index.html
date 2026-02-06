@@ -1,0 +1,1616 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Neon Cartel Simulator (Fiction)</title>
+  <style>
+    :root{
+      color-scheme: dark;
+      --bg0:#070211;
+      --bg1:#0b0620;
+      --glass: rgba(18,10,34,.55);
+      --glass2: rgba(14,8,26,.50);
+      --stroke: rgba(255,255,255,.10);
+      --stroke2: rgba(255,255,255,.14);
+      --txt:#fff;
+      --muted:#c7bfe6;
+      --p1:#b44cff; /* purple */
+      --p2:#ff4fd8; /* pink */
+      --p3:#6ee7ff; /* cyan */
+      --good:#7cffbf;
+      --warn:#ffd36e;
+      --bad:#ff6b8a;
+      --shadow: 0 28px 110px rgba(0,0,0,.70);
+      --r: 26px;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      color:var(--txt);
+      background:
+        radial-gradient(1200px 680px at 10% 12%, rgba(180,76,255,.24), transparent 60%),
+        radial-gradient(1200px 680px at 90% 10%, rgba(255,79,216,.22), transparent 60%),
+        radial-gradient(1100px 680px at 30% 92%, rgba(110,231,255,.14), transparent 62%),
+        radial-gradient(1000px 620px at 88% 85%, rgba(255,107,138,.08), transparent 65%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      overflow-x:hidden;
+    }
+
+    /* grain overlay */
+    body::before{
+      content:"";
+      position:fixed; inset:0;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.16'/%3E%3C/svg%3E");
+      opacity:.18;
+      mix-blend-mode: overlay;
+      pointer-events:none;
+      z-index:2;
+    }
+
+    #fx{
+      position:fixed; inset:0;
+      z-index:1;
+      pointer-events:none;
+      opacity:.9;
+    }
+
+    .wrap{
+      position:relative;
+      z-index:3;
+      max-width: 1320px;
+      margin:0 auto;
+      padding:20px;
+    }
+
+    /* topbar */
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      margin-bottom:16px;
+    }
+    .brand{display:flex;align-items:center;gap:12px;user-select:none}
+    .logo{
+      width:54px;height:54px;border-radius:18px;
+      background: linear-gradient(135deg, rgba(180,76,255,.98), rgba(255,79,216,.88));
+      box-shadow:
+        0 18px 54px rgba(180,76,255,.26),
+        0 12px 46px rgba(255,79,216,.18);
+      position:relative;overflow:hidden;
+      transform: translateZ(0);
+    }
+    .logo::after{
+      content:"";
+      position:absolute; inset:-70%;
+      background: conic-gradient(from 210deg, transparent, rgba(255,255,255,.20), transparent);
+      animation: spin 7.5s linear infinite;
+      opacity:.72;
+      pointer-events:none;
+    }
+    @keyframes spin { to { transform: rotate(360deg);} }
+    .title b{display:block;font-size:16px;font-weight:980;letter-spacing:.2px}
+    .title span{display:block;margin-top:3px;font-size:12px;color:var(--muted);letter-spacing:.2px}
+
+    .metaRow{
+      display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;
+    }
+    .pill{
+      display:flex; align-items:center; gap:10px;
+      padding:10px 12px; border-radius:18px;
+      border:1px solid var(--stroke);
+      background: rgba(18,10,34,.55);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 18px 60px rgba(0,0,0,.35);
+      position:relative; overflow:hidden;
+    }
+    .pill::before{
+      content:""; position:absolute; inset:-60%;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255,79,216,.22), transparent 60%),
+        radial-gradient(circle at 80% 80%, rgba(180,76,255,.18), transparent 60%);
+      opacity:.75; pointer-events:none;
+    }
+    .dot{
+      width:10px;height:10px;border-radius:999px;
+      background: rgba(255,79,216,.92);
+      box-shadow: 0 0 22px rgba(255,79,216,.35);
+      position:relative; z-index:1;
+    }
+    .pill .k{font-size:11px;color:var(--muted);position:relative;z-index:1}
+    .pill .v{font-size:13px;font-weight:980;position:relative;z-index:1}
+
+    /* shell layout */
+    .shell{
+      border-radius: var(--r);
+      border:1px solid var(--stroke);
+      background: rgba(18,10,34,.48);
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position:relative;
+    }
+    .shell::before{
+      content:"";
+      position:absolute; inset:-65%;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(180,76,255,.18), transparent 60%),
+        radial-gradient(circle at 90% 20%, rgba(255,79,216,.16), transparent 62%),
+        radial-gradient(circle at 60% 90%, rgba(110,231,255,.10), transparent 62%);
+      opacity:.85;
+      pointer-events:none;
+    }
+
+    .layout{
+      display:grid;
+      grid-template-columns: 340px 1fr;
+      min-height: 720px;
+      position:relative; z-index:1;
+    }
+    @media (max-width: 1020px){
+      .layout{grid-template-columns:1fr}
+    }
+
+    /* sidebar */
+    .sidebar{
+      border-right:1px solid rgba(255,255,255,.06);
+      padding:18px;
+      background: rgba(14,8,26,.36);
+    }
+    @media (max-width: 1020px){
+      .sidebar{border-right:none;border-bottom:1px solid rgba(255,255,255,.06)}
+    }
+    .navTitle{
+      font-size:12px;color:var(--muted);letter-spacing:.25px;margin-bottom:10px
+    }
+    .navBtn{
+      width:100%;
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      padding:13px 14px;border-radius:18px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(14,8,26,.50);
+      color:#fff;cursor:pointer;user-select:none;
+      font-weight:980;
+      transition: transform .10s ease, border-color .18s ease, filter .18s ease, box-shadow .18s ease;
+      margin-bottom:10px;
+      position:relative;overflow:hidden;
+      transform: translateZ(0);
+    }
+    .navBtn::after{
+      content:"";
+      position:absolute; inset:-70%;
+      background: conic-gradient(from 210deg, transparent, rgba(255,255,255,.12), transparent);
+      opacity:.28;
+      animation: spin 14s linear infinite;
+      pointer-events:none;
+    }
+    .navBtn:hover{
+      border-color: rgba(255,79,216,.34);
+      filter: brightness(1.06);
+      box-shadow: 0 16px 55px rgba(0,0,0,.30);
+      transform: translateY(-2px);
+    }
+    .navBtn:active{transform: translateY(-1px) scale(.995)}
+    .navBtn .left{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+    .ico{
+      width:42px;height:42px;border-radius:16px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(18,10,34,.38);
+      display:grid;place-items:center;font-size:20px;
+      box-shadow: 0 0 28px rgba(180,76,255,.10);
+    }
+    .navBtn small{color:var(--muted);font-weight:800;font-size:11px;position:relative;z-index:1}
+    .sideCard{
+      margin-top:14px;
+      border-radius:20px;
+      border:1px solid rgba(255,255,255,.10);
+      background:
+        radial-gradient(320px 240px at 18% 18%, rgba(180,76,255,.20), transparent 60%),
+        radial-gradient(320px 240px at 88% 86%, rgba(255,79,216,.16), transparent 62%),
+        rgba(14,8,26,.44);
+      padding:14px;
+      position:relative; overflow:hidden;
+    }
+    .sideCard b{display:block;font-size:13px;letter-spacing:.2px}
+    .sideCard span{display:block;margin-top:6px;font-size:12px;color:var(--muted);line-height:1.45}
+    .sideCard .row{display:flex;justify-content:space-between;gap:10px;margin-top:8px}
+    .tag{
+      display:inline-flex;align-items:center;gap:8px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(18,10,34,.42);
+      padding:7px 12px;border-radius:999px;
+      font-weight:980;font-size:11px;color:#fff;
+    }
+    .tag.good{border-color: rgba(124,255,191,.24)}
+    .tag.warn{border-color: rgba(255,211,110,.24)}
+    .tag.bad{border-color: rgba(255,107,138,.24)}
+
+    /* content */
+    .content{padding:18px}
+    .page{display:none; animation: fadeUp .20s ease-out}
+    .page.active{display:block}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+    .pageHead{
+      display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
+      margin-bottom:14px;
+    }
+    .pageHead b{display:block;font-size:18px;font-weight:990;letter-spacing:.2px}
+    .pageHead span{display:block;margin-top:4px;color:var(--muted);font-size:12px;letter-spacing:.2px}
+
+    .btn{
+      padding:12px 16px;border-radius:16px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(14,8,26,.52);
+      color:#fff;font-weight:980;
+      cursor:pointer;user-select:none;
+      transition: transform .08s ease, filter .15s ease, border-color .18s ease, box-shadow .18s ease;
+      display:inline-flex;align-items:center;gap:10px;justify-content:center;
+      position:relative;overflow:hidden;
+      transform: translateZ(0);
+    }
+    .btn:hover{
+      filter: brightness(1.08);
+      border-color: rgba(255,79,216,.35);
+      box-shadow: 0 12px 40px rgba(0,0,0,.25), 0 0 34px rgba(255,79,216,.12);
+    }
+    .btn:active{transform: translateY(1px) scale(.992)}
+    .btn.primary{
+      border-color: rgba(255,79,216,.30);
+      background: linear-gradient(135deg, rgba(180,76,255,.30), rgba(255,79,216,.18));
+    }
+    .btn.full{width:100%}
+    .btn.row{width:100%}
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap:14px;
+    }
+    @media (max-width: 1100px){
+      .grid{grid-template-columns: 1fr}
+    }
+
+    .panel{
+      border-radius: 24px;
+      border:1px solid rgba(255,255,255,.10);
+      background:
+        radial-gradient(420px 300px at 20% 20%, rgba(180,76,255,.16), transparent 60%),
+        radial-gradient(420px 300px at 85% 85%, rgba(255,79,216,.12), transparent 62%),
+        rgba(14,8,26,.52);
+      padding:16px;
+      position:relative; overflow:hidden;
+    }
+    .panel::after{
+      content:""; position:absolute; inset:-70%;
+      background: conic-gradient(from 210deg, transparent, rgba(255,255,255,.10), transparent);
+      animation: spin 18s linear infinite;
+      opacity:.25; pointer-events:none;
+    }
+
+    .cards{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap:14px;
+    }
+    @media (max-width: 1100px){ .cards{grid-template-columns: repeat(2, minmax(0, 1fr));} }
+    @media (max-width: 720px){ .cards{grid-template-columns: 1fr;} }
+
+    .cardItem{
+      border-radius: 22px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(18,10,34,.34);
+      padding:14px;
+      position:relative; overflow:hidden;
+      transition: transform .10s ease, border-color .18s ease, filter .18s ease, box-shadow .18s ease;
+    }
+    .cardItem:hover{
+      transform: translateY(-2px);
+      border-color: rgba(255,79,216,.26);
+      filter: brightness(1.04);
+      box-shadow: 0 18px 60px rgba(0,0,0,.28);
+    }
+    .cardItem:active{transform: translateY(-1px) scale(.995)}
+    .badge{
+      display:inline-flex;align-items:center;gap:8px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(18,10,34,.42);
+      padding:7px 12px;border-radius:999px;
+      font-weight:980;font-size:11px;color:#fff;
+      margin-bottom:10px;
+    }
+    .badge.purple{border-color: rgba(180,76,255,.26)}
+    .badge.pink{border-color: rgba(255,79,216,.26)}
+    .badge.cyan{border-color: rgba(110,231,255,.24)}
+
+    .cardItem b{display:block;font-size:14px;font-weight:990;letter-spacing:.2px}
+    .cardItem p{margin:6px 0 10px;color:var(--muted);font-size:12px;line-height:1.4;min-height:38px}
+    .row2{display:grid;grid-template-columns: 1fr 1fr; gap:10px}
+    @media (max-width: 720px){ .row2{grid-template-columns:1fr} }
+
+    .priceRow{
+      display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+      padding:10px 12px;border-radius:16px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(14,8,26,.40);
+      margin: 10px 0 12px;
+    }
+    .priceRow span{color:#d9d3ff;font-weight:950;font-size:12px;letter-spacing:.2px}
+    .priceRow b{
+      font-size:16px;font-weight:1000;margin:0;
+      background: linear-gradient(90deg, rgba(180,76,255,.98), rgba(255,79,216,.98));
+      -webkit-background-clip:text;background-clip:text;color:transparent;
+    }
+
+    .tbl{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0 10px;
+      position:relative;
+      z-index:1;
+    }
+    .tbl td, .tbl th{
+      text-align:left;
+      padding:10px 12px;
+      font-size:12px;
+    }
+    .tbl th{color:var(--muted);font-weight:900}
+    .tr{
+      background: rgba(14,8,26,.40);
+      border:1px solid rgba(255,255,255,.10);
+    }
+    .tr td:first-child{border-top-left-radius:16px;border-bottom-left-radius:16px}
+    .tr td:last-child{border-top-right-radius:16px;border-bottom-right-radius:16px}
+    .kpi{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+    .k{
+      flex:1 1 160px;
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(14,8,26,.40);
+      padding:10px 12px;
+    }
+    .k .a{color:var(--muted);font-size:11px;font-weight:900}
+    .k .b{font-size:16px;font-weight:1000;margin-top:4px}
+    .k .b.grad{
+      background: linear-gradient(90deg, rgba(180,76,255,.98), rgba(255,79,216,.98));
+      -webkit-background-clip:text;background-clip:text;color:transparent;
+    }
+
+    /* modal */
+    .modalBack{
+      position:fixed; inset:0;
+      display:none;
+      align-items:center; justify-content:center;
+      padding:18px;
+      background: rgba(0,0,0,.66);
+      z-index:50;
+    }
+    .modalBack.show{display:flex}
+    .modal{
+      width:100%;
+      max-width: 860px;
+      border-radius:26px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(18,10,34,.92);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position:relative;
+      animation: fadeUp .18s ease-out;
+    }
+    .modal::before{
+      content:"";
+      position:absolute; inset:-70%;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(180,76,255,.22), transparent 60%),
+        radial-gradient(circle at 85% 80%, rgba(255,79,216,.18), transparent 62%);
+      opacity:.9;
+      pointer-events:none;
+    }
+    .mHead{
+      padding:14px 14px;
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      position:relative;z-index:1;
+    }
+    .mHead b{font-size:14px;font-weight:990;letter-spacing:.2px}
+    .xbtn{
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(14,8,26,.55);
+      color:#fff;border-radius:14px;
+      padding:9px 12px;cursor:pointer;font-weight:980;
+      transition:.15s;
+    }
+    .xbtn:hover{border-color: rgba(255,79,216,.32); transform: translateY(-1px)}
+    .xbtn:active{transform: scale(.98)}
+    .mBody{padding:14px;position:relative;z-index:1}
+    .help{color:var(--muted);font-size:12px;line-height:1.45}
+    .mActions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .row3{display:grid;grid-template-columns: repeat(3, 1fr); gap:10px}
+    @media (max-width: 720px){ .row3{grid-template-columns: 1fr} }
+
+    /* toast */
+    .toast{
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      padding: 10px 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(18,10,34,.86);
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow);
+      color:#fff;
+      font-weight:980;
+      font-size:13px;
+      opacity:0;
+      pointer-events:none;
+      transition: opacity .18s ease, transform .18s ease;
+      z-index:60;
+    }
+    .toast.show{opacity:1; transform: translateX(-50%) translateY(-4px)}
+  </style>
+</head>
+
+<body>
+<canvas id="fx"></canvas>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo"></div>
+      <div class="title">
+        <b>Neon Cartel Simulator</b>
+        <span>вымышленная контрабанда • экономика • риск</span>
+      </div>
+    </div>
+
+    <div class="metaRow">
+      <div class="pill">
+        <div class="dot"></div>
+        <div>
+          <div class="k">Месяц</div>
+          <div class="v" id="uiMonth">1</div>
+        </div>
+      </div>
+      <div class="pill">
+        <div class="dot" style="background:rgba(110,231,255,.95); box-shadow:0 0 22px rgba(110,231,255,.35)"></div>
+        <div>
+          <div class="k">Heat</div>
+          <div class="v" id="uiHeat">0%</div>
+        </div>
+      </div>
+      <div class="pill">
+        <div class="dot" style="background:rgba(124,255,191,.95); box-shadow:0 0 22px rgba(124,255,191,.35)"></div>
+        <div>
+          <div class="k">Cash</div>
+          <div class="v" id="uiCash">$0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="navTitle">Меню</div>
+
+        <button class="navBtn" data-page="market">
+          <div class="left">
+            <div class="ico">🧪</div>
+            <div>Рынок<br><small>купить/продать груз</small></div>
+          </div>
+          <div style="position:relative;z-index:1;">›</div>
+        </button>
+
+        <button class="navBtn" data-page="inventory">
+          <div class="left">
+            <div class="ico">📦</div>
+            <div>Инвентарь<br><small>склад и прибыль</small></div>
+          </div>
+          <div style="position:relative;z-index:1;">›</div>
+        </button>
+
+        <button class="navBtn" data-page="assets">
+          <div class="left">
+            <div class="ico">🏠</div>
+            <div>Активы<br><small>дома • машины • бизнес</small></div>
+          </div>
+          <div style="position:relative;z-index:1;">›</div>
+        </button>
+
+        <button class="navBtn" data-page="upgrades">
+          <div class="left">
+            <div class="ico">🧠</div>
+            <div>Прокачка<br><small>скиллы и перки</small></div>
+          </div>
+          <div style="position:relative;z-index:1;">›</div>
+        </button>
+
+        <button class="navBtn" data-page="log">
+          <div class="left">
+            <div class="ico">🗂️</div>
+            <div>События<br><small>история месяца</small></div>
+          </div>
+          <div style="position:relative;z-index:1;">›</div>
+        </button>
+
+        <div class="sideCard">
+          <b>Ход времени</b>
+          <span>Нажми “Прожить месяц” — цены меняются. Продажа может вызвать проверку.</span>
+          <div class="row">
+            <span class="tag good" id="tagCar">🚗 Машина: —</span>
+            <span class="tag warn" id="tagHouse">🏠 База: —</span>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn primary row" id="btnNextMonth">⏳ Прожить месяц</button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="content">
+        <!-- MARKET -->
+        <section class="page active" id="page-market">
+          <div class="pageHead">
+            <div>
+              <b>Рынок</b>
+              <span>Цены меняются каждый месяц</span>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn" id="btnSave">💾 Сохранить</button>
+              <button class="btn" id="btnReset">♻️ Сброс</button>
+            </div>
+          </div>
+
+          <div class="grid">
+            <div class="panel">
+              <div class="badge purple">📈 Прайсы</div>
+              <table class="tbl" id="tblMarket">
+                <thead>
+                  <tr>
+                    <th>Товар</th>
+                    <th>Цена</th>
+                    <th>Спред</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="marketBody"></tbody>
+              </table>
+              <div class="kpi">
+                <div class="k"><div class="a">Лимит склада</div><div class="b grad" id="uiCap">0</div></div>
+                <div class="k"><div class="a">Заполнено</div><div class="b grad" id="uiUsed">0</div></div>
+                <div class="k"><div class="a">Риск при продаже</div><div class="b grad" id="uiRisk">0%</div></div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="badge pink">🎯 Быстрое действие</div>
+              <div class="cards">
+                <div class="cardItem">
+                  <div class="badge cyan">💸</div>
+                  <b>Продать всё (по рынку)</b>
+                  <p>Сначала проверит риск. Затем продаст доступные позиции.</p>
+                  <button class="btn primary full" id="btnSellAll">Продать всё</button>
+                </div>
+
+                <div class="cardItem">
+                  <div class="badge purple">🧯</div>
+                  <b>Снизить Heat</b>
+                  <p>Потратить деньги на “шума-очистку”.</p>
+                  <div class="priceRow"><span>Стоимость</span><b id="uiCoolCost">$0</b></div>
+                  <button class="btn full" id="btnCool">Сбросить Heat</button>
+                </div>
+
+                <div class="cardItem">
+                  <div class="badge pink">🛡️</div>
+                  <b>Купить защиту</b>
+                  <p>Снижает риск и повышает шанс “уйти”.</p>
+                  <div class="priceRow"><span>Стоимость</span><b id="uiArmorCost">$0</b></div>
+                  <button class="btn full" id="btnArmor">Купить</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- INVENTORY -->
+        <section class="page" id="page-inventory">
+          <div class="pageHead">
+            <div>
+              <b>Инвентарь</b>
+              <span>Склад и статистика</span>
+            </div>
+          </div>
+
+          <div class="grid">
+            <div class="panel">
+              <div class="badge cyan">📦 Склад</div>
+              <table class="tbl">
+                <thead>
+                  <tr>
+                    <th>Товар</th>
+                    <th>Кол-во</th>
+                    <th>Средняя закупка</th>
+                    <th>Оценка по рынку</th>
+                  </tr>
+                </thead>
+                <tbody id="invBody"></tbody>
+              </table>
+            </div>
+
+            <div class="panel">
+              <div class="badge purple">📊 Показатели</div>
+              <div class="kpi">
+                <div class="k"><div class="a">Чистая прибыль</div><div class="b grad" id="uiProfit">$0</div></div>
+                <div class="k"><div class="a">Лучший месяц</div><div class="b grad" id="uiBestMonth">$0</div></div>
+                <div class="k"><div class="a">Всего сделок</div><div class="b grad" id="uiDeals">0</div></div>
+              </div>
+              <div style="height:12px"></div>
+              <div class="badge pink">🧠 Подсказка</div>
+              <div class="help" id="uiHint"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ASSETS -->
+        <section class="page" id="page-assets">
+          <div class="pageHead">
+            <div>
+              <b>Активы</b>
+              <span>Машины влияют на шанс уйти. Базы увеличивают склад.</span>
+            </div>
+          </div>
+
+          <div class="grid">
+            <div class="panel">
+              <div class="badge purple">🚗 Машины</div>
+              <div class="cards" id="carsGrid"></div>
+            </div>
+
+            <div class="panel">
+              <div class="badge pink">🏠 Базы</div>
+              <div class="cards" id="housesGrid"></div>
+
+              <div style="height:12px"></div>
+              <div class="badge cyan">🏭 Бизнес</div>
+              <div class="cards" id="bizGrid"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- UPGRADES -->
+        <section class="page" id="page-upgrades">
+          <div class="pageHead">
+            <div>
+              <b>Прокачка</b>
+              <span>Перки улучшают спред, снижают риск и увеличивают прибыль</span>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="badge cyan">⚙️ Перки</div>
+            <div class="cards" id="perksGrid"></div>
+          </div>
+        </section>
+
+        <!-- LOG -->
+        <section class="page" id="page-log">
+          <div class="pageHead">
+            <div>
+              <b>События</b>
+              <span>Последние сообщения</span>
+            </div>
+            <button class="btn" id="btnClearLog">Очистить</button>
+          </div>
+
+          <div class="panel">
+            <div class="badge purple">🗂️ Лента</div>
+            <div id="logBox" style="display:grid;gap:10px"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+</div>
+
+<!-- EVENT MODAL -->
+<div class="modalBack" id="eventBack">
+  <div class="modal">
+    <div class="mHead">
+      <b id="eventTitle">Проверка</b>
+      <button class="xbtn" id="eventClose">✕</button>
+    </div>
+    <div class="mBody">
+      <div class="help" id="eventText"></div>
+
+      <div class="row3" style="margin-top:12px">
+        <button class="btn" id="actDump">🗑️ Выбросить груз</button>
+        <button class="btn primary" id="actRun">🏎️ Уйти</button>
+        <button class="btn" id="actBribe">💵 Взятка</button>
+      </div>
+
+      <div class="priceRow" style="margin-top:12px">
+        <span>Шанс уйти (машина/перки)</span>
+        <b id="eventRunChance">0%</b>
+      </div>
+      <div class="priceRow">
+        <span>Цена “взятки”</span>
+        <b id="eventBribeCost">$0</b>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">Ок</div>
+
+<script>
+/* ========= FX BACKGROUND (particles + glow) ========= */
+(function(){
+  const c = document.getElementById('fx');
+  const ctx = c.getContext('2d');
+  let w=0,h=0, dpr=1;
+  const P = [];
+  const N = 110;
+
+  function resize(){
+    dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    w = c.width = Math.floor(window.innerWidth * dpr);
+    h = c.height = Math.floor(window.innerHeight * dpr);
+    c.style.width = window.innerWidth + 'px';
+    c.style.height = window.innerHeight + 'px';
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function rnd(a,b){ return a + Math.random()*(b-a); }
+
+  function add(i){
+    P[i] = {
+      x: rnd(0,w), y: rnd(0,h),
+      vx: rnd(-.18,.18)*dpr, vy: rnd(-.18,.18)*dpr,
+      r: rnd(1.0,2.2)*dpr,
+      a: rnd(.25,.75),
+      t: rnd(0, 6.28)
+    };
+  }
+  for(let i=0;i<N;i++) add(i);
+
+  function draw(){
+    ctx.clearRect(0,0,w,h);
+
+    // soft glow fields
+    const g1 = ctx.createRadialGradient(w*0.18,h*0.22, 0, w*0.18,h*0.22, Math.min(w,h)*0.45);
+    g1.addColorStop(0, 'rgba(180,76,255,0.20)');
+    g1.addColorStop(1, 'rgba(180,76,255,0.00)');
+    ctx.fillStyle = g1; ctx.fillRect(0,0,w,h);
+
+    const g2 = ctx.createRadialGradient(w*0.82,h*0.18, 0, w*0.82,h*0.18, Math.min(w,h)*0.42);
+    g2.addColorStop(0, 'rgba(255,79,216,0.18)');
+    g2.addColorStop(1, 'rgba(255,79,216,0.00)');
+    ctx.fillStyle = g2; ctx.fillRect(0,0,w,h);
+
+    const g3 = ctx.createRadialGradient(w*0.32,h*0.88, 0, w*0.32,h*0.88, Math.min(w,h)*0.46);
+    g3.addColorStop(0, 'rgba(110,231,255,0.12)');
+    g3.addColorStop(1, 'rgba(110,231,255,0.00)');
+    ctx.fillStyle = g3; ctx.fillRect(0,0,w,h);
+
+    // particles
+    for(const p of P){
+      p.x += p.vx; p.y += p.vy;
+      p.t += 0.01;
+      if(p.x< -50*dpr) p.x = w+50*dpr;
+      if(p.x> w+50*dpr) p.x = -50*dpr;
+      if(p.y< -50*dpr) p.y = h+50*dpr;
+      if(p.y> h+50*dpr) p.y = -50*dpr;
+
+      const tw = (Math.sin(p.t)+1)*0.5;
+      const rr = p.r*(0.75 + tw*0.65);
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, rr, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(255,255,255,${0.08*p.a})`;
+      ctx.fill();
+    }
+
+    // connect near points (subtle)
+    for(let i=0;i<N;i++){
+      for(let j=i+1;j<N;j++){
+        const a=P[i], b=P[j];
+        const dx=a.x-b.x, dy=a.y-b.y;
+        const dist = Math.sqrt(dx*dx+dy*dy);
+        if(dist < 120*dpr){
+          const alpha = (1 - dist/(120*dpr))*0.06;
+          ctx.strokeStyle = `rgba(255,79,216,${alpha})`;
+          ctx.beginPath();
+          ctx.moveTo(a.x,a.y);
+          ctx.lineTo(b.x,b.y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ========= GAME ========= */
+const $ = (id)=>document.getElementById(id);
+const toastEl = $('toast');
+
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(()=>toastEl.classList.remove('show'), 1400);
+}
+
+function money(n){
+  const sign = n<0 ? "-" : "";
+  n = Math.abs(Math.floor(n));
+  return sign + "$" + n.toLocaleString("en-US");
+}
+
+function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
+function rnd(a,b){ return a + Math.random()*(b-a); }
+function chance(p){ return Math.random() < p; }
+
+const ITEMS = [
+  { id:"moon_dust", name:"Moon Dust", vibe:"лунная пыль", base: 1200, vol: 1 },
+  { id:"neon_spice", name:"Neon Spice", vibe:"неоновая специя", base: 2400, vol: 1 },
+  { id:"cipher_caps", name:"Cipher Caps", vibe:"шифр-капсулы", base: 3900, vol: 1 },
+  { id:"void_resin", name:"Void Resin", vibe:"смола пустоты", base: 5200, vol: 2 },
+  { id:"pink_glass", name:"Pink Glass", vibe:"розовое стекло", base: 7800, vol: 2 },
+  { id:"aurora_crystal", name:"Aurora Crystal", vibe:"кристалл авроры", base: 11000, vol: 3 },
+];
+
+const CARS = [
+  { id:"none", name:"Пешком", price: 0, run: 0.10, heatMul: 1.15 },
+  { id:"hatch", name:"Hatchback", price: 12000, run: 0.18, heatMul: 1.05 },
+  { id:"sedan", name:"Sedan", price: 24000, run: 0.24, heatMul: 1.00 },
+  { id:"sport", name:"Sport", price: 52000, run: 0.34, heatMul: 0.92 },
+  { id:"armored", name:"Armored", price: 98000, run: 0.44, heatMul: 0.86 },
+  { id:"ghost", name:"Ghost GT", price: 165000, run: 0.56, heatMul: 0.78 },
+];
+
+const HOUSES = [
+  { id:"room", name:"Комната", price: 0, cap: 20 },
+  { id:"flat", name:"Квартира", price: 18000, cap: 40 },
+  { id:"house", name:"Дом", price: 52000, cap: 75 },
+  { id:"villa", name:"Вилла", price: 120000, cap: 120 },
+  { id:"bunker", name:"Бункер", price: 260000, cap: 200 },
+];
+
+const BIZ = [
+  { id:"none", name:"Нет бизнеса", price: 0, income: 0 },
+  { id:"laundry", name:"Прачечная", price: 25000, income: 1800 },
+  { id:"club", name:"Ночной клуб", price: 85000, income: 6400 },
+  { id:"logistics", name:"Логистика", price: 170000, income: 14000 },
+  { id:"empire", name:"Империя", price: 420000, income: 38000 },
+];
+
+const PERKS = [
+  { id:"negotiator", name:"Переговорщик", desc:"Лучше цены покупки (-3%/ур.)", base: 9000, max: 6 },
+  { id:"salesman", name:"Продажник", desc:"Лучше цены продажи (+3%/ур.)", base: 9000, max: 6 },
+  { id:"ghosting", name:"Тихий режим", desc:"Ниже риск при продаже (-2%/ур.)", base: 12000, max: 8 },
+  { id:"runner", name:"Гонщик", desc:"Выше шанс уйти (+3%/ур.)", base: 14000, max: 8 },
+  { id:"warehouse", name:"Склад", desc:"Больше вместимость (+5%/ур.)", base: 15000, max: 10 },
+  { id:"network", name:"Сеть", desc:"Бизнес приносит больше (+6%/ур.)", base: 18000, max: 8 },
+];
+
+const SAVE_KEY = "neon_cartel_save_v1";
+
+const defaultState = () => ({
+  month: 1,
+  cash: 25000,
+  heat: 0,             // 0..100
+  armor: 0,            // protection level
+  deals: 0,
+  profit: 0,
+  bestMonth: 0,
+  carId: "none",
+  houseId: "room",
+  bizId: "none",
+  perks: Object.fromEntries(PERKS.map(p=>[p.id, 0])),
+  inv: Object.fromEntries(ITEMS.map(it=>[it.id, { qty: 0, avg: 0 }])),
+  prices: Object.fromEntries(ITEMS.map(it=>[it.id, it.base])),
+  log: []
+});
+
+let S = load() || defaultState();
+
+function load(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return null;
+    const obj = JSON.parse(raw);
+    return obj;
+  }catch(e){ return null; }
+}
+function save(){
+  localStorage.setItem(SAVE_KEY, JSON.stringify(S));
+  toast("Сохранено");
+}
+function reset(){
+  localStorage.removeItem(SAVE_KEY);
+  S = defaultState();
+  renderAll();
+  toast("Сброшено");
+}
+function log(msg, tone="purple"){
+  const entry = { t: Date.now(), msg, tone };
+  S.log.unshift(entry);
+  if(S.log.length > 60) S.log.length = 60;
+  renderLog();
+}
+
+function perk(id){ return S.perks[id] || 0; }
+function car(){ return CARS.find(x=>x.id===S.carId) || CARS[0]; }
+function house(){ return HOUSES.find(x=>x.id===S.houseId) || HOUSES[0]; }
+function biz(){ return BIZ.find(x=>x.id===S.bizId) || BIZ[0]; }
+
+function cap(){
+  const base = house().cap;
+  const extra = 1 + perk("warehouse")*0.05;
+  return Math.floor(base * extra);
+}
+function used(){
+  let u=0;
+  for(const it of ITEMS){
+    u += (S.inv[it.id].qty||0) * it.vol;
+  }
+  return u;
+}
+
+function riskSellBase(){
+  // base risk increases with heat, armor reduces, perks reduce, car can reduce via heatMul
+  const heat = S.heat / 100; // 0..1
+  const base = 0.06 + heat*0.22; // 6% .. 28%
+  const armorRed = Math.min(0.10, S.armor*0.02); // up to 10%
+  const perkRed = Math.min(0.14, perk("ghosting")*0.02); // up to 14%
+  const carMul = car().heatMul; // <1 helps
+  return clamp((base * carMul) - armorRed - perkRed, 0.02, 0.40);
+}
+
+function runChance(){
+  // car base + perk runner + armor slight + heat penalty
+  const base = car().run;
+  const perkUp = perk("runner")*0.03;
+  const armorUp = Math.min(0.06, S.armor*0.01);
+  const heatPenalty = (S.heat/100)*0.10;
+  return clamp(base + perkUp + armorUp - heatPenalty, 0.05, 0.92);
+}
+
+function bribeCost(){
+  // depends on heat + cargo value
+  let cargoValue = 0;
+  for(const it of ITEMS){
+    const q = S.inv[it.id].qty||0;
+    cargoValue += q * S.prices[it.id];
+  }
+  const heatFactor = 1 + (S.heat/100)*1.3;
+  return Math.floor(2500 * heatFactor + cargoValue * 0.05);
+}
+
+function buyPrice(itemId){
+  const p = S.prices[itemId];
+  const disc = 1 - perk("negotiator")*0.03;
+  return Math.max(1, Math.floor(p * disc));
+}
+function sellPrice(itemId){
+  const p = S.prices[itemId];
+  const up = 1 + perk("salesman")*0.03;
+  return Math.max(1, Math.floor(p * up));
+}
+
+function coolCost(){
+  // pay to reduce heat
+  const lvl = S.heat;
+  return Math.floor(1200 + lvl*140);
+}
+function armorCost(){
+  // progressive
+  const next = S.armor + 1;
+  return Math.floor(9000 * (1.18 ** (next-1)));
+}
+
+function setPage(key){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.getElementById("page-"+key).classList.add("active");
+}
+
+document.querySelectorAll("[data-page]").forEach(btn=>{
+  btn.addEventListener("click", ()=> setPage(btn.getAttribute("data-page")));
+});
+
+$("btnSave").onclick = save;
+$("btnReset").onclick = ()=>{
+  if(confirm("Сбросить прогресс?")) reset();
+};
+
+$("btnClearLog").onclick = ()=>{
+  S.log = [];
+  renderLog();
+  toast("Очищено");
+};
+
+$("btnNextMonth").onclick = nextMonth;
+$("btnSellAll").onclick = sellAll;
+
+$("btnCool").onclick = ()=>{
+  const cost = coolCost();
+  if(S.cash < cost) return toast("Не хватает cash");
+  S.cash -= cost;
+  const before = S.heat;
+  S.heat = clamp(S.heat - (35 + perk("ghosting")*3), 0, 100);
+  log(`Снижение Heat: ${before}% → ${S.heat}% (${money(cost)})`, "cyan");
+  renderAll();
+};
+
+$("btnArmor").onclick = ()=>{
+  const cost = armorCost();
+  if(S.cash < cost) return toast("Не хватает cash");
+  S.cash -= cost;
+  S.armor += 1;
+  log(`Защита +1 (ур. ${S.armor}) за ${money(cost)}`, "purple");
+  renderAll();
+};
+
+/* ===== Market actions per item ===== */
+function buyItem(itemId){
+  const it = ITEMS.find(x=>x.id===itemId);
+  const price = buyPrice(itemId);
+  const vol = it.vol;
+
+  if(used() + vol > cap()) return toast("Склад переполнен");
+  if(S.cash < price) return toast("Не хватает cash");
+
+  S.cash -= price;
+  S.deals += 1;
+
+  // update avg buy price
+  const slot = S.inv[itemId];
+  const oldQ = slot.qty;
+  const newQ = oldQ + 1;
+  slot.avg = oldQ === 0 ? price : Math.floor((slot.avg*oldQ + price)/newQ);
+  slot.qty = newQ;
+
+  // heat increases slightly per buy
+  S.heat = clamp(S.heat + rnd(0.2, 0.9) * (car().heatMul), 0, 100);
+
+  log(`Куплено: ${it.name} за ${money(price)}`, "pink");
+  renderAll();
+}
+
+function trySellItem(itemId, qty){
+  const it = ITEMS.find(x=>x.id===itemId);
+  const slot = S.inv[itemId];
+  qty = Math.min(qty, slot.qty);
+  if(qty <= 0) return 0;
+
+  // Sell event chance
+  const risk = riskSellBase();
+  const willStop = chance(risk);
+
+  if(willStop){
+    // open event modal and store pending sale
+    pending = { type:"sell", itemId, qty };
+    openEvent(`Проверка при продаже`, `Тебя остановили при сделке. Выбор: выбросить груз / уйти / “взятка”.`);
+    return -1; // paused
+  }
+
+  // proceed sell
+  return doSell(itemId, qty);
+}
+
+function doSell(itemId, qty){
+  const it = ITEMS.find(x=>x.id===itemId);
+  const slot = S.inv[itemId];
+
+  qty = Math.min(qty, slot.qty);
+  if(qty <= 0) return 0;
+
+  const price = sellPrice(itemId);
+  const income = price * qty;
+  const cost = slot.avg * qty;
+  const delta = income - cost;
+
+  S.cash += income;
+  S.profit += delta;
+  S.deals += 1;
+
+  slot.qty -= qty;
+  if(slot.qty === 0) slot.avg = 0;
+
+  // heat grows on sale
+  S.heat = clamp(S.heat + rnd(0.8, 2.2) * (car().heatMul), 0, 100);
+
+  log(`Продано: ${it.name} x${qty} за ${money(income)} (Δ ${money(delta)})`, "good");
+  return income;
+}
+
+function sellAll(){
+  // attempt sell all; if event triggers, it will pause at first risky sell
+  let total = 0;
+  for(const it of ITEMS){
+    const q = S.inv[it.id].qty || 0;
+    if(q > 0){
+      const res = trySellItem(it.id, q);
+      if(res === -1) return; // paused due to event
+      total += res;
+    }
+  }
+  if(total <= 0) toast("Нечего продавать");
+  else toast("Сделка завершена");
+  renderAll();
+}
+
+/* ===== Month tick ===== */
+function nextMonth(){
+  // business income
+  const baseIncome = biz().income;
+  const incomeMul = 1 + perk("network")*0.06;
+  const bizIncome = Math.floor(baseIncome * incomeMul);
+  if(bizIncome > 0){
+    S.cash += bizIncome;
+    log(`Бизнес доход: ${biz().name} +${money(bizIncome)}`, "cyan");
+  }
+
+  // monthly decay heat
+  const before = S.heat;
+  S.heat = clamp(S.heat - (8 + perk("ghosting")*2), 0, 100);
+  if(before !== S.heat) log(`Heat: ${before.toFixed(0)}% → ${S.heat.toFixed(0)}%`, "purple");
+
+  // move month
+  S.month += 1;
+
+  // update prices with volatility
+  for(const it of ITEMS){
+    const base = it.base;
+    const vol = (0.22 + it.vol*0.05); // bigger items more volatile
+    const wave = rnd(-vol, vol);
+    const momentum = rnd(-0.08, 0.08);
+    const p = S.prices[it.id];
+    const target = base * (1 + wave);
+    const next = p * (1 + momentum) * 0.55 + target * 0.45;
+    S.prices[it.id] = Math.max(120, Math.floor(next));
+  }
+
+  // month score snapshot
+  const monthP = 0; // kept simple; best month tracks later in selling
+  S.bestMonth = Math.max(S.bestMonth, monthP);
+
+  log(`Месяц #${S.month}: цены обновились`, "pink");
+  renderAll();
+}
+
+/* ===== Event system (bust / stop) ===== */
+let pending = null;
+
+const eventBack = $("eventBack");
+const eventTitle = $("eventTitle");
+const eventText = $("eventText");
+const eventRunChance = $("eventRunChance");
+const eventBribeCost = $("eventBribeCost");
+
+$("eventClose").onclick = closeEvent;
+eventBack.addEventListener("click", (e)=>{ if(e.target === eventBack) closeEvent(); });
+
+function openEvent(title, text){
+  eventTitle.textContent = title;
+  eventText.textContent = text;
+  eventRunChance.textContent = Math.round(runChance()*100) + "%";
+  eventBribeCost.textContent = money(bribeCost());
+  eventBack.classList.add("show");
+}
+function closeEvent(){
+  eventBack.classList.remove("show");
+  pending = null;
+}
+
+$("actDump").onclick = ()=>{
+  if(!pending) return closeEvent();
+
+  // lose ALL inventory
+  let lost=0;
+  for(const it of ITEMS){
+    const q = S.inv[it.id].qty||0;
+    if(q>0){
+      lost += q * sellPrice(it.id);
+      S.inv[it.id].qty = 0;
+      S.inv[it.id].avg = 0;
+    }
+  }
+  S.heat = clamp(S.heat + 6, 0, 100);
+  log(`Груз выброшен. Потеря оценочно: ${money(lost)}`, "bad");
+  closeEvent();
+  renderAll();
+};
+
+$("actRun").onclick = ()=>{
+  if(!pending) return closeEvent();
+
+  const p = runChance();
+  if(chance(p)){
+    // successful escape
+    const heatUp = 6 + Math.floor(rnd(0,6));
+    S.heat = clamp(S.heat + heatUp, 0, 100);
+    log(`Ушёл от проверки. Heat +${heatUp}%`, "cyan");
+    closeEvent();
+    renderAll();
+    return;
+  }
+
+  // failed escape: confiscate pending qty (or all)
+  if(pending.type === "sell"){
+    const it = ITEMS.find(x=>x.id===pending.itemId);
+    const q = pending.qty;
+    const slot = S.inv[pending.itemId];
+    const lost = Math.min(q, slot.qty);
+
+    slot.qty -= lost;
+    if(slot.qty === 0) slot.avg = 0;
+
+    // penalty
+    const fine = Math.floor(bribeCost()*0.35 + 2500);
+    S.cash = Math.max(0, S.cash - fine);
+    S.heat = clamp(S.heat + 18, 0, 100);
+
+    log(`Не ушёл. Конфискация: ${it.name} x${lost}. Штраф: ${money(fine)}`, "bad");
+  }else{
+    log(`Не ушёл. Штраф и Heat выросли.`, "bad");
+    S.cash = Math.max(0, S.cash - Math.floor(6000 + S.heat*80));
+    S.heat = clamp(S.heat + 16, 0, 100);
+  }
+
+  closeEvent();
+  renderAll();
+};
+
+$("actBribe").onclick = ()=>{
+  if(!pending) return closeEvent();
+
+  const cost = bribeCost();
+  if(S.cash < cost){
+    toast("Не хватает cash");
+    return;
+  }
+
+  // bribe success chance depends on perks and heat
+  const base = 0.62 + perk("negotiator")*0.03 - (S.heat/100)*0.25;
+  const ok = chance(clamp(base, 0.20, 0.92));
+
+  S.cash -= cost;
+
+  if(ok){
+    S.heat = clamp(S.heat + 4, 0, 100);
+    log(`Взятка прошла: -${money(cost)}. Сделка продолжена.`, "good");
+
+    // if pending sell, proceed now
+    if(pending.type === "sell"){
+      doSell(pending.itemId, pending.qty);
+    }
+
+  }else{
+    S.heat = clamp(S.heat + 20, 0, 100);
+    const fine = Math.floor(cost*0.65 + 3500);
+    S.cash = Math.max(0, S.cash - fine);
+
+    // lose some cargo
+    if(pending.type === "sell"){
+      const it = ITEMS.find(x=>x.id===pending.itemId);
+      const slot = S.inv[pending.itemId];
+      const lost = Math.min(pending.qty, slot.qty);
+      slot.qty -= lost;
+      if(slot.qty === 0) slot.avg = 0;
+      log(`Взятка провалилась. Конфискация: ${it.name} x${lost}. Штраф: ${money(fine)} (+ потеря ${money(cost)})`, "bad");
+    }else{
+      log(`Взятка провалилась. Штраф: ${money(fine)} (+ потеря ${money(cost)})`, "bad");
+    }
+  }
+
+  closeEvent();
+  renderAll();
+};
+
+/* ===== UI render ===== */
+function renderTop(){
+  $("uiMonth").textContent = String(S.month);
+  $("uiHeat").textContent = `${Math.round(S.heat)}%`;
+  $("uiCash").textContent = money(S.cash);
+  $("uiCap").textContent = String(cap());
+  $("uiUsed").textContent = String(used());
+  $("uiRisk").textContent = `${Math.round(riskSellBase()*100)}%`;
+
+  $("uiCoolCost").textContent = money(coolCost());
+  $("uiArmorCost").textContent = money(armorCost());
+
+  $("tagCar").textContent = `🚗 Машина: ${car().name}`;
+  $("tagHouse").textContent = `🏠 База: ${house().name}`;
+  $("tagCar").className = "tag " + (runChance() >= 0.45 ? "good" : runChance() >= 0.25 ? "warn" : "bad");
+  $("tagHouse").className = "tag " + (cap() >= 120 ? "good" : cap() >= 60 ? "warn" : "bad");
+}
+
+function renderMarket(){
+  const body = $("marketBody");
+  body.innerHTML = "";
+
+  for(const it of ITEMS){
+    const p = S.prices[it.id];
+    const buy = buyPrice(it.id);
+    const sell = sellPrice(it.id);
+    const spread = Math.round(((sell - buy) / Math.max(1, buy)) * 100);
+
+    const tr = document.createElement("tr");
+    tr.className = "tr";
+    tr.innerHTML = `
+      <td><b style="font-size:12px">${it.name}</b><div style="color:var(--muted);font-size:11px;margin-top:3px">${it.vibe} • объем ${it.vol}</div></td>
+      <td><div style="font-weight:980">${money(p)}</div><div style="color:var(--muted);font-size:11px;margin-top:3px">buy ${money(buy)} / sell ${money(sell)}</div></td>
+      <td><span style="font-weight:980;color:${spread>=0?'var(--good)':'var(--bad)'}">${spread}%</span></td>
+      <td style="width:180px">
+        <div class="row2">
+          <button class="btn" data-act="buy" data-id="${it.id}">Купить</button>
+          <button class="btn primary" data-act="sell" data-id="${it.id}">Продать</button>
+        </div>
+      </td>
+    `;
+    body.appendChild(tr);
+  }
+
+  body.querySelectorAll("[data-act]").forEach(btn=>{
+    const act = btn.getAttribute("data-act");
+    const id = btn.getAttribute("data-id");
+    btn.onclick = ()=>{
+      if(act === "buy") buyItem(id);
+      if(act === "sell"){
+        const q = S.inv[id].qty || 0;
+        if(q <= 0) return toast("Нет на складе");
+        const res = trySellItem(id, 1); // sell 1 by button
+        if(res !== -1) renderAll();
+      }
+    };
+  });
+}
+
+function renderInv(){
+  const b = $("invBody");
+  b.innerHTML = "";
+  let totalValue = 0;
+
+  for(const it of ITEMS){
+    const slot = S.inv[it.id];
+    const q = slot.qty||0;
+    const avg = slot.avg||0;
+    const est = q * sellPrice(it.id);
+    totalValue += est;
+
+    const tr = document.createElement("tr");
+    tr.className = "tr";
+    tr.innerHTML = `
+      <td><b style="font-size:12px">${it.name}</b><div style="color:var(--muted);font-size:11px;margin-top:3px">${it.vibe}</div></td>
+      <td style="font-weight:980">${q}</td>
+      <td>${avg? money(avg): "—"}</td>
+      <td style="font-weight:980">${q? money(est): "—"}</td>
+    `;
+    b.appendChild(tr);
+  }
+
+  $("uiProfit").textContent = money(S.profit);
+  $("uiBestMonth").textContent = money(S.bestMonth);
+  $("uiDeals").textContent = String(S.deals);
+
+  const hint = [];
+  const r = riskSellBase();
+  const rc = runChance();
+  if(r > 0.22) hint.push("Риск высокий: снизь Heat или купи защиту.");
+  else hint.push("Риск норм: ловить спред и продавать частями.");
+
+  if(rc < 0.25) hint.push("Машина слабая: апгрейд транспорта поднимет шанс уйти.");
+  if(used() > cap()*0.85) hint.push("Склад почти полный: расширь базу или продай лишнее.");
+  hint.push(`Оценка склада: ${money(totalValue)}.`);
+  $("uiHint").textContent = hint.join(" ");
+}
+
+function renderAssets(){
+  const carsGrid = $("carsGrid");
+  const housesGrid = $("housesGrid");
+  const bizGrid = $("bizGrid");
+  carsGrid.innerHTML = "";
+  housesGrid.innerHTML = "";
+  bizGrid.innerHTML = "";
+
+  for(const c of CARS){
+    const owned = (S.carId === c.id);
+    const can = S.cash >= c.price;
+    const div = document.createElement("div");
+    div.className = "cardItem";
+    div.innerHTML = `
+      <div class="badge ${owned ? "cyan":"purple"}">🚗</div>
+      <b>${c.name}</b>
+      <p>Шанс уйти: <b style="color:var(--good)">${Math.round(c.run*100)}%</b> • Heat множитель: <b style="color:var(--muted)">${c.heatMul.toFixed(2)}x</b></p>
+      <div class="priceRow"><span>Цена</span><b>${c.price ? money(c.price) : "—"}</b></div>
+      <button class="btn ${owned?'':'primary'} full" ${owned?'disabled':''} data-buycar="${c.id}">
+        ${owned ? "Выбрано" : (c.price===0 ? "Выбрать" : (can ? "Купить/Выбрать" : "Не хватает"))}
+      </button>
+    `;
+    carsGrid.appendChild(div);
+  }
+
+  carsGrid.querySelectorAll("[data-buycar]").forEach(btn=>{
+    btn.onclick = ()=>{
+      const id = btn.getAttribute("data-buycar");
+      const c = CARS.find(x=>x.id===id);
+      if(S.carId === id) return;
+      if(c.price > 0 && S.cash < c.price) return toast("Не хватает cash");
+      if(c.price > 0){
+        S.cash -= c.price;
+        log(`Машина: ${c.name} (${money(c.price)})`, "cyan");
+      }else{
+        log(`Машина: ${c.name}`, "cyan");
+      }
+      S.carId = id;
+      renderAll();
+    };
+  });
+
+  for(const h of HOUSES){
+    const owned = (S.houseId === h.id);
+    const can = S.cash >= h.price;
+    const div = document.createElement("div");
+    div.className = "cardItem";
+    div.innerHTML = `
+      <div class="badge ${owned ? "cyan":"pink"}">🏠</div>
+      <b>${h.name}</b>
+      <p>Вместимость: <b style="color:var(--good)">${h.cap}</b></p>
+      <div class="priceRow"><span>Цена</span><b>${h.price ? money(h.price) : "—"}</b></div>
+      <button class="btn ${owned?'':'primary'} full" ${owned?'disabled':''} data-buyhouse="${h.id}">
+        ${owned ? "Выбрано" : (h.price===0 ? "Выбрать" : (can ? "Купить/Выбрать" : "Не хватает"))}
+      </button>
+    `;
+    housesGrid.appendChild(div);
+  }
+
+  housesGrid.querySelectorAll("[data-buyhouse]").forEach(btn=>{
+    btn.onclick = ()=>{
+      const id = btn.getAttribute("data-buyhouse");
+      const h = HOUSES.find(x=>x.id===id);
+      if(S.houseId === id) return;
+      if(h.price > 0 && S.cash < h.price) return toast("Не хватает cash");
+      if(h.price > 0){
+        S.cash -= h.price;
+        log(`База: ${h.name} (${money(h.price)})`, "pink");
+      }else{
+        log(`База: ${h.name}`, "pink");
+      }
+      S.houseId = id;
+      renderAll();
+    };
+  });
+
+  for(const b of BIZ){
+    const owned = (S.bizId === b.id);
+    const can = S.cash >= b.price;
+    const inc = Math.floor(b.income * (1 + perk("network")*0.06));
+    const div = document.createElement("div");
+    div.className = "cardItem";
+    div.innerHTML = `
+      <div class="badge ${owned ? "cyan":"purple"}">🏭</div>
+      <b>${b.name}</b>
+      <p>Доход/мес: <b style="color:var(--good)">${money(inc)}</b></p>
+      <div class="priceRow"><span>Цена</span><b>${b.price ? money(b.price) : "—"}</b></div>
+      <button class="btn ${owned?'':'primary'} full" ${owned?'disabled':''} data-buybiz="${b.id}">
+        ${owned ? "Выбрано" : (b.price===0 ? "Выбрать" : (can ? "Купить/Выбрать" : "Не хватает"))}
+      </button>
+    `;
+    bizGrid.appendChild(div);
+  }
+
+  bizGrid.querySelectorAll("[data-buybiz]").forEach(btn=>{
+    btn.onclick = ()=>{
+      const id = btn.getAttribute("data-buybiz");
+      const b = BIZ.find(x=>x.id===id);
+      if(S.bizId === id) return;
+      if(b.price > 0 && S.cash < b.price) return toast("Не хватает cash");
+      if(b.price > 0){
+        S.cash -= b.price;
+        log(`Бизнес: ${b.name} (${money(b.price)})`, "purple");
+      }else{
+        log(`Бизнес: ${b.name}`, "purple");
+      }
+      S.bizId = id;
+      renderAll();
+    };
+  });
+}
+
+function perkCost(p){
+  const lvl = perk(p.id);
+  const next = lvl + 1;
+  const base = p.base;
+  return Math.floor(base * (1.22 ** (next-1)));
+}
+
+function renderPerks(){
+  const g = $("perksGrid");
+  g.innerHTML = "";
+
+  for(const p of PERKS){
+    const lvl = perk(p.id);
+    const max = p.max;
+    const canUp = lvl < max;
+    const cost = perkCost(p);
+    const ok = S.cash >= cost;
+
+    const div = document.createElement("div");
+    div.className = "cardItem";
+    div.innerHTML = `
+      <div class="badge ${lvl? "cyan":"pink"}">🧠</div>
+      <b>${p.name} <span style="color:var(--muted);font-weight:900;font-size:12px">ур. ${lvl}/${max}</span></b>
+      <p>${p.desc}</p>
+      <div class="priceRow"><span>Апгрейд</span><b>${money(cost)}</b></div>
+      <button class="btn primary full" ${(!canUp || !ok) ? "disabled":""} data-perk="${p.id}">
+        ${canUp ? (ok ? "Улучшить" : "Не хватает") : "Макс"}
+      </button>
+    `;
+    g.appendChild(div);
+  }
+
+  g.querySelectorAll("[data-perk]").forEach(btn=>{
+    btn.onclick = ()=>{
+      const id = btn.getAttribute("data-perk");
+      const p = PERKS.find(x=>x.id===id);
+      const lvl = perk(id);
+      if(lvl >= p.max) return;
+      const cost = perkCost(p);
+      if(S.cash < cost) return toast("Не хватает cash");
+      S.cash -= cost;
+      S.perks[id] = lvl + 1;
+      log(`Прокачка: ${p.name} ур. ${S.perks[id]} (${money(cost)})`, "cyan");
+      renderAll();
+    };
+  });
+}
+
+function renderLog(){
+  const box = $("logBox");
+  box.innerHTML = "";
+  for(const e of S.log){
+    const card = document.createElement("div");
+    card.className = "cardItem";
+    const tone = e.tone || "purple";
+    card.innerHTML = `
+      <div class="badge ${tone==="good"?"cyan":tone==="bad"?"pink":tone==="warn"?"pink":tone==="cyan"?"cyan":"purple"}">🗂️</div>
+      <b>${new Date(e.t).toLocaleString()}</b>
+      <p>${e.msg}</p>
+    `;
+    box.appendChild(card);
+  }
+  if(!S.log.length){
+    const empty = document.createElement("div");
+    empty.className = "cardItem";
+    empty.innerHTML = `<div class="badge purple">🗂️</div><b>Пусто</b><p>События появятся после сделок и месяцев.</p>`;
+    box.appendChild(empty);
+  }
+}
+
+function renderAll(){
+  renderTop();
+  renderMarket();
+  renderInv();
+  renderAssets();
+  renderPerks();
+  renderLog();
+}
+
+/* initial log + render */
+if(!S.log.length){
+  log("Старт: купи что-нибудь на рынке и проживи месяц, чтобы увидеть динамику цен.", "purple");
+}
+renderAll();
+</script>
+</body>
+  </html>
