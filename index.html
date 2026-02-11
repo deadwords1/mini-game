@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DarkSurvival — Рулетка</title>
+  <style>
+    :root{
+      --bg0:#070812;
+      --bg1:#0B0F22;
+      --card: rgba(255,255,255,.06);
+      --card2: rgba(255,255,255,.08);
+      --border: rgba(255,255,255,.10);
+      --text:#EAF0FF;
+      --muted: rgba(234,240,255,.7);
+      --accent:#A855F7;   /* violet */
+      --accent2:#22D3EE;  /* cyan */
+      --good:#22C55E;
+      --warn:#F59E0B;
+      --bad:#EF4444;
+      --shadow: 0 18px 60px rgba(0,0,0,.55);
+      --radius: 18px;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 700px at 15% 15%, rgba(168,85,247,.25), transparent 60%),
+        radial-gradient(900px 700px at 85% 20%, rgba(34,211,238,.18), transparent 60%),
+        radial-gradient(900px 800px at 70% 90%, rgba(168,85,247,.18), transparent 60%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      min-height: 100vh;
+      overflow-x:hidden;
+    }
+
+    /* subtle animated noise/glow */
+    .glow {
+      position: fixed;
+      inset: -120px;
+      pointer-events:none;
+      background:
+        radial-gradient(500px 300px at 20% 30%, rgba(34,211,238,.08), transparent 60%),
+        radial-gradient(520px 320px at 70% 60%, rgba(168,85,247,.10), transparent 60%);
+      filter: blur(24px);
+      animation: floatGlow 8s ease-in-out infinite alternate;
+      opacity:.9;
+    }
+    @keyframes floatGlow{
+      from { transform: translate3d(-10px,-8px,0) scale(1); }
+      to   { transform: translate3d(12px,10px,0) scale(1.02); }
+    }
+
+    .topbar{
+      height: 56px;
+      display:flex;
+      align-items:center;
+      padding: 0 14px;
+      gap: 12px;
+      position: sticky;
+      top:0;
+      z-index: 10;
+      backdrop-filter: blur(14px);
+      background: rgba(10,12,22,.55);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .topbar .brand{
+      display:flex; align-items:center; gap:10px;
+      font-weight: 900;
+      letter-spacing: .3px;
+      opacity: .98;
+    }
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+      font-weight: 800;
+      color: rgba(234,240,255,.92);
+    }
+    .chip i{
+      width:10px; height:10px; border-radius:99px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      box-shadow: 0 0 18px rgba(168,85,247,.5);
+      display:inline-block;
+    }
+
+    .wrap{
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 14px 14px 26px;
+    }
+    .hero{
+      padding: 14px 2px 10px;
+      display:flex;
+      flex-direction:column;
+      gap: 8px;
+      align-items:flex-start;
+    }
+    .hero h1{
+      margin:0;
+      font-size: 30px;
+      line-height:1.05;
+      font-weight: 1000;
+      letter-spacing: .2px;
+    }
+    .hero p{
+      margin:0;
+      color: var(--muted);
+      font-weight: 800;
+      line-height: 1.35;
+      font-size: 13px;
+      max-width: 56ch;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      align-items:start;
+    }
+    @media (min-width: 900px){
+      .grid{
+        grid-template-columns: 1.15fr .85fr;
+        gap: 14px;
+      }
+      .hero h1{font-size: 34px;}
+    }
+
+    .card{
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.05));
+      border: 1px solid rgba(255,255,255,.10);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position: relative;
+    }
+    .card::before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      background:
+        radial-gradient(600px 260px at 20% 10%, rgba(168,85,247,.18), transparent 60%),
+        radial-gradient(520px 260px at 80% 40%, rgba(34,211,238,.14), transparent 60%);
+      filter: blur(18px);
+      opacity:.55;
+      pointer-events:none;
+    }
+    .cardInner{
+      position: relative;
+      padding: 12px;
+    }
+
+    /* Wheel zone */
+    .wheelZone{
+      display:grid;
+      place-items:center;
+      padding: 8px 0 12px;
+      gap: 10px;
+    }
+
+    .wheelShell{
+      width: min(88vw, 440px);
+      aspect-ratio: 1/1;
+      position: relative;
+      display:grid;
+      place-items:center;
+    }
+
+    canvas{
+      width: 100%;
+      height: 100%;
+      border-radius: 999px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.10);
+      box-shadow:
+        0 18px 60px rgba(0,0,0,.55),
+        0 0 0 10px rgba(168,85,247,.06),
+        0 0 0 18px rgba(34,211,238,.04);
+    }
+
+    .pointer{
+      position:absolute;
+      top: -6px;
+      width: 0; height:0;
+      border-left: 16px solid transparent;
+      border-right: 16px solid transparent;
+      border-top: 28px solid rgba(234,240,255,.92);
+      filter: drop-shadow(0 10px 16px rgba(0,0,0,.55));
+    }
+    .pointer::after{
+      content:"";
+      position:absolute;
+      left:-16px; top:-28px;
+      width: 32px; height: 32px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      transform: translateY(-18px);
+      box-shadow: 0 0 26px rgba(168,85,247,.55);
+      opacity:.95;
+    }
+
+    .btn{
+      width: min(88vw, 440px);
+      padding: 14px 16px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: linear-gradient(135deg, rgba(168,85,247,.95), rgba(34,211,238,.85));
+      color: #071021;
+      font-weight: 1000;
+      letter-spacing: .3px;
+      cursor:pointer;
+      box-shadow:
+        0 18px 60px rgba(0,0,0,.55),
+        0 0 26px rgba(168,85,247,.25);
+      transition: transform .12s ease, filter .12s ease;
+      position: relative;
+      overflow:hidden;
+    }
+    .btn::before{
+      content:"";
+      position:absolute;
+      inset:-120px;
+      background: radial-gradient(220px 140px at 30% 40%, rgba(255,255,255,.55), transparent 60%);
+      transform: translateX(-40%);
+      opacity:.25;
+      animation: sheen 2.6s linear infinite;
+      pointer-events:none;
+    }
+    @keyframes sheen{
+      from { transform: translateX(-50%); }
+      to   { transform: translateX(40%); }
+    }
+    .btn:active{transform: translateY(1px) scale(.995); filter: brightness(.98);}
+    .btn:disabled{opacity:.55; cursor:not-allowed; box-shadow:none}
+
+    .miniRow{
+      display:flex;
+      gap: 10px;
+      width: min(88vw, 440px);
+    }
+    .btnGhost{
+      flex:1;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: rgba(234,240,255,.92);
+      font-weight: 900;
+      cursor:pointer;
+      transition: transform .12s ease, filter .12s ease;
+    }
+    .btnGhost:active{transform: translateY(1px); filter: brightness(.97);}
+
+    /* Right side inputs */
+    .stack{display:flex; flex-direction:column; gap: 12px;}
+    .field{
+      display:flex; flex-direction:column; gap: 8px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 16px;
+      padding: 12px;
+    }
+    .field label{
+      font-weight: 1000;
+      letter-spacing:.2px;
+      color: rgba(234,240,255,.95);
+    }
+    .input{
+      width:100%;
+      padding: 12px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.18);
+      color: rgba(234,240,255,.95);
+      font-weight: 900;
+      outline:none;
+    }
+    .helper{
+      color: rgba(234,240,255,.70);
+      font-weight: 800;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .odds{
+      display:flex;
+      flex-direction:column;
+      gap: 8px;
+      padding: 12px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 16px;
+    }
+    .odds h3{
+      margin:0;
+      font-size: 14px;
+      font-weight: 1000;
+      letter-spacing:.2px;
+    }
+    .pill{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 10px;
+      padding: 10px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+      font-weight: 900;
+      font-size: 12.5px;
+    }
+    .pill b{
+      font-weight: 1000;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      background-clip:text;
+      color: transparent;
+    }
+
+    /* Shake error */
+    .shake{
+      animation: shake .35s ease;
+      border-color: rgba(239,68,68,.55) !important;
+      box-shadow: 0 0 0 3px rgba(239,68,68,.12);
+    }
+    @keyframes shake{
+      0%{transform:translateX(0)}
+      25%{transform:translateX(-6px)}
+      50%{transform:translateX(6px)}
+      75%{transform:translateX(-4px)}
+      100%{transform:translateX(0)}
+    }
+
+    /* Modal */
+    .overlay{
+      position: fixed; inset:0;
+      background: rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding: 18px;
+      z-index: 50;
+      backdrop-filter: blur(8px);
+    }
+    .overlay.show{display:flex}
+    .modal{
+      width: min(560px, 96vw);
+      border-radius: 18px;
+      overflow:hidden;
+      border: 1px solid rgba(255,255,255,.12);
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
+      box-shadow: 0 24px 80px rgba(0,0,0,.7);
+      position: relative;
+    }
+    .modal::before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      background:
+        radial-gradient(650px 240px at 20% 10%, rgba(168,85,247,.25), transparent 60%),
+        radial-gradient(650px 240px at 80% 30%, rgba(34,211,238,.18), transparent 60%);
+      filter: blur(20px);
+      opacity:.7;
+      pointer-events:none;
+    }
+    .modalHead{
+      position:relative;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding: 14px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.10);
+    }
+    .modalHead h3{margin:0; font-size: 16px; font-weight: 1000; letter-spacing:.2px;}
+    .closeX{
+      width: 40px; height:40px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      color: rgba(234,240,255,.92);
+      font-weight: 1000;
+      cursor:pointer;
+    }
+    .modalBody{position:relative; padding: 14px;}
+    .winTitle{
+      font-size: 24px;
+      font-weight: 1000;
+      margin: 2px 0 8px;
+      letter-spacing:.2px;
+      text-align:center;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      background-clip:text;
+      color: transparent;
+    }
+    .winDesc{
+      text-align:center;
+      color: rgba(234,240,255,.86);
+      font-weight: 800;
+      line-height: 1.35;
+      margin: 0 0 10px;
+      font-size: 13px;
+    }
+    .codeBox{
+      text-align:center;
+      font-weight: 1000;
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 14px;
+      padding: 10px 12px;
+      margin: 12px 0 12px;
+      word-break: break-word;
+      color: rgba(234,240,255,.92);
+    }
+    .modalActions{
+      position:relative;
+      display:flex;
+      gap: 10px;
+      justify-content:center;
+      padding: 12px 14px 16px;
+      border-top: 1px solid rgba(255,255,255,.10);
+      flex-wrap: wrap;
+    }
+    .actionBtn{
+      min-width: 190px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.12);
+      padding: 12px 14px;
+      font-weight: 1000;
+      cursor:pointer;
+      transition: transform .12s ease, filter .12s ease;
+    }
+    .actionBtn:active{transform: translateY(1px); filter:brightness(.98);}
+    .actionBtn.gray{
+      background: rgba(255,255,255,.06);
+      color: rgba(234,240,255,.92);
+    }
+    .actionBtn.orange{
+      background: linear-gradient(135deg, rgba(168,85,247,.95), rgba(34,211,238,.85));
+      color: #071021;
+    }
+
+    /* Confetti canvas */
+    #confetti{
+      position: fixed;
+      inset:0;
+      pointer-events:none;
+      z-index: 60;
+      display:none;
+    }
+    #confetti.show{display:block}
+
+    /* tiny footer note */
+    .foot{
+      margin-top: 10px;
+      color: rgba(234,240,255,.65);
+      font-weight: 800;
+      font-size: 12px;
+      line-height: 1.35;
+      text-align:center;
+      opacity:.9;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="glow"></div>
+
+  <div class="topbar">
+    <div class="brand">
+      <span class="chip"><i></i> DarkSurvival</span>
+      <span class="chip">🎡 Рулетка</span>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="hero">
+      <h1>Выбей приз с промокода</h1>
+      <p>Крутые призы реально редкие. После победы нажми “Забрать” — откроется Telegram чат с @SalesManagerX и уже готовым сообщением + Claim ID.</p>
+    </div>
+
+    <div class="grid">
+      <!-- LEFT: Wheel -->
+      <div class="card">
+        <div class="cardInner">
+          <div class="wheelZone">
+            <div class="wheelShell">
+              <div class="pointer"></div>
+              <canvas id="wheel" width="520" height="520"></canvas>
+            </div>
+
+            <button class="btn" id="spinBtn">Крутить</button>
+
+            <div class="miniRow">
+              <button class="btnGhost" id="howBtn">Как это работает</button>
+              <button class="btnGhost" id="oddsBtn">Шансы</button>
+            </div>
+
+            <div class="foot" id="note">
+              Промокод (кроме админского) работает 1 раз на этом устройстве. Админ-промо: <b>1</b>.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Inputs & odds -->
+      <div class="stack">
+        <div class="field" id="promoField">
+          <label for="promo">Промокод</label>
+          <input class="input" id="promo" placeholder="DS-7F2K9" autocomplete="off" />
+          <div class="helper">
+            Для теста можешь вводить админ-промо <b>1</b> (крутить бесконечно). Остальные — одноразовые на устройстве.
+          </div>
+        </div>
+
+        <div class="field" id="nickField">
+          <label for="nick">Ник на сервере</label>
+          <input class="input" id="nick" placeholder="например: spxce_mxn" autocomplete="off" />
+          <div class="helper">
+            Ник нужен, чтобы “Забрать приз”. Без ника кнопка выдачи не сработает.
+          </div>
+        </div>
+
+        <div class="odds" id="oddsBox">
+          <h3>Самые редкие призы</h3>
+          <div class="pill"><span>Привилегия VOID</span><b>0.3%</b></div>
+          <div class="pill"><span>Привилегия LUXE</span><b>1.2%</b></div>
+          <div class="pill"><span>Валюта 50 000₽</span><b>1.0%</b></div>
+          <div class="pill"><span>Поинты +50</span><b>1.5%</b></div>
+          <div class="helper" style="margin-top:6px;">
+            Сделано так, чтобы жирное выбить было сложно.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confetti -->
+  <canvas id="confetti"></canvas>
+
+  <!-- Win modal -->
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <div class="modalHead">
+        <h3>🎉 Победа!</h3>
+        <button class="closeX" id="closeModal">✕</button>
+      </div>
+      <div class="modalBody">
+        <div class="winTitle" id="winTitle">—</div>
+        <div class="winDesc" id="winDesc">—</div>
+        <div class="codeBox" id="claimBox">Claim ID: —</div>
+        <div class="helper" style="text-align:center;">
+          Нажми «Забрать приз» — откроется чат с @SalesManagerX. Менеджер проверит Claim ID.
+        </div>
+      </div>
+      <div class="modalActions">
+        <button class="actionBtn gray" id="copyBtn">Скопировать Claim ID</button>
+        <button class="actionBtn orange" id="claimBtn">Забрать приз</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ====== SETTINGS ======
+  const SALES_USERNAME = "SalesManagerX";
+  const ADMIN_PROMO = "1";
+  const PROMOS = ["DS-7F2K9","DS-A3M8Q","DS-V9P1X","DS-4J6ZT","DS-N2W5L","DS-8C0RD","DS-K1H7B","DS-Q6T2Y","DS-5U9SN","DS-X3D4G"];
+
+  // ====== PRIZES (weights in %) ======
+  const PRIZES = [
+    { id:"vip",       label:"Привилегия VIP",      type:"rank",   value:"VIP",      weight:10.0, emoji:"🟩", desc:"Выдача привилегии VIP на сервере." },
+    { id:"platinum",  label:"Привилегия PLATINUM", type:"rank",   value:"PLATINUM", weight:5.0,  emoji:"⬜", desc:"Выдача привилегии PLATINUM на сервере." },
+    { id:"luxe",      label:"Привилегия LUXE",     type:"rank",   value:"LUXE",     weight:1.2,  emoji:"💎", desc:"Выдача привилегии LUXE на сервере." },
+    { id:"void",      label:"Привилегия VOID",     type:"rank",   value:"VOID",     weight:0.3,  emoji:"🟪", desc:"Выдача привилегии VOID на сервере." },
+
+    { id:"rub_1000",  label:"Валюта 1 000₽",       type:"money",  value:1000,       weight:20.0, emoji:"💸", desc:"Денежный приз 1 000₽." },
+    { id:"rub_5000",  label:"Валюта 5 000₽",       type:"money",  value:5000,       weight:16.0, emoji:"💰", desc:"Денежный приз 5 000₽." },
+    { id:"rub_10000", label:"Валюта 10 000₽",      type:"money",  value:10000,      weight:10.0, emoji:"💵", desc:"Денежный приз 10 000₽." },
+    { id:"rub_50000", label:"Валюта 50 000₽",      type:"money",  value:50000,      weight:1.0,  emoji:"🏆", desc:"Денежный приз 50 000₽ (редкий дроп)." },
+
+    { id:"p_5",       label:"Поинты +5",           type:"points", value:5,          weight:15.0, emoji:"⭐", desc:"Игровые поинты +5." },
+    { id:"p_10",      label:"Поинты +10",          type:"points", value:10,         weight:10.0, emoji:"🌟", desc:"Игровые поинты +10." },
+    { id:"p_20",      label:"Поинты +20",          type:"points", value:20,         weight:7.0,  emoji:"✨", desc:"Игровые поинты +20." },
+    { id:"p_30",      label:"Поинты +30",          type:"points", value:30,         weight:3.0,  emoji:"🔥", desc:"Игровые поинты +30." },
+    { id:"p_50",      label:"Поинты +50",          type:"points", value:50,         weight:1.5,  emoji:"👑", desc:"Игровые поинты +50 (редко)." },
+  ];
+
+  // ====== DOM ======
+  const $ = (id)=>document.getElementById(id);
+  const canvas = $("wheel");
+  const ctx = canvas.getContext("2d");
+  const spinBtn = $("spinBtn");
+  const promoInput = $("promo");
+  const nickInput = $("nick");
+  const promoField = $("promoField");
+  const nickField = $("nickField");
+  const overlay = $("overlay");
+  const winTitle = $("winTitle");
+  const winDesc = $("winDesc");
+  const claimBox = $("claimBox");
+  const confettiCanvas = $("confetti");
+  const cctx = confettiCanvas.getContext("2d");
+
+  // ====== Helpers ======
+  function sumWeights(){ return PRIZES.reduce((a,p)=>a+p.weight,0); }
+  function pickWeighted(){
+    let r = Math.random() * sumWeights();
+    for(const p of PRIZES){
+      r -= p.weight;
+      if(r <= 0) return p;
+    }
+    return PRIZES[PRIZES.length-1];
+  }
+  function promoUsedKey(p){ return `ds_promo_used_${p}`; }
+  function isPromoAllowed(promo){
+    promo = (promo||"").trim();
+    if(!promo) return { ok:false, reason:"Введите промокод." };
+    if(promo === ADMIN_PROMO) return { ok:true, admin:true };
+    if(!PROMOS.includes(promo)) return { ok:false, reason:"Неверный промокод." };
+    if(localStorage.getItem(promoUsedKey(promo)) === "1") return { ok:false, reason:"Этот промокод уже использован на этом устройстве." };
+    return { ok:true, admin:false };
+  }
+  function markPromoUsed(promo){
+    if(promo === ADMIN_PROMO) return;
+    localStorage.setItem(promoUsedKey(promo), "1");
+  }
+  function genClaimId(){
+    const arr = new Uint32Array(3);
+    crypto.getRandomValues(arr);
+    const base = Array.from(arr).map(x=>x.toString(36)).join("-").toUpperCase();
+    const t = Date.now().toString(36).toUpperCase();
+    return `DS-${t}-${base}`;
+  }
+  function openTelegram(username, text){
+    const url = `https://t.me/${encodeURIComponent(username)}?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank");
+  }
+  function buildTelegramText(win){
+    const nick = (nickInput.value||"").trim();
+    const promo = (win.promo||"").trim();
+    return [
+      "Приветствую! Хочу забрать приз из рулетки DarkSurvival.",
+      "",
+      "Ник: " + nick,
+      "Промокод: " + promo,
+      "Приз: " + win.prize.label,
+      "Claim ID: " + win.claimId,
+      "Время: " + new Date(win.ts).toLocaleString("ru-RU"),
+      "",
+      "Пожалуйста, проверьте Claim ID."
+    ].join("\n");
+  }
+
+  // ====== Responsive canvas sizing (real pixels) ======
+  function fitCanvas(){
+    const shell = document.querySelector(".wheelShell");
+    const rect = shell.getBoundingClientRect();
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const size = Math.floor(Math.min(rect.width, rect.height) * dpr);
+    canvas.width = size;
+    canvas.height = size;
+    drawWheel(currentRotation);
+  }
+  window.addEventListener("resize", fitCanvas);
+
+  // ====== Wheel drawing ======
+  function hsl(h,s,l,a=1){ return `hsla(${h} ${s}% ${l}% / ${a})`; }
+  function shortLabel(txt){
+    return txt.replace("Привилегия ","").replace("Валюта ","").replace("Поинты ","+");
+  }
+
+  let currentRotation = 0;
+  let spinning = false;
+  let lastWin = null;
+
+  function drawWheel(rot){
+    const w = canvas.width, h = canvas.height;
+    const cx = w/2, cy = h/2;
+    const radius = Math.min(cx,cy) - 10;
+
+    ctx.clearRect(0,0,w,h);
+
+    // outer glow ring
+    ctx.save();
+    ctx.translate(cx,cy);
+    ctx.beginPath();
+    ctx.arc(0,0,radius,0,Math.PI*2);
+    ctx.closePath();
+    ctx.shadowColor = "rgba(168,85,247,.35)";
+    ctx.shadowBlur = 28;
+    ctx.strokeStyle = "rgba(255,255,255,.08)";
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.restore();
+
+    const n = PRIZES.length;
+    const arc = (Math.PI*2)/n;
+
+    ctx.save();
+    ctx.translate(cx,cy);
+    ctx.rotate(rot);
+
+    for(let i=0;i<n;i++){
+      const p = PRIZES[i];
+      const start = i*arc;
+      const end = start + arc;
+
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.arc(0,0,radius,start,end);
+      ctx.closePath();
+
+      const hue = (i * (360/n) + 280) % 360; // violet/cyan vibes
+      const grad = ctx.createLinearGradient(
+        Math.cos(start)*radius, Math.sin(start)*radius,
+        Math.cos(end)*radius, Math.sin(end)*radius
+      );
+      grad.addColorStop(0, hsl(hue, 85, 55, 0.30));
+      grad.addColorStop(1, hsl((hue+40)%360, 85, 55, 0.18));
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255,255,255,.12)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // label
+      ctx.save();
+      ctx.rotate(start + arc/2);
+      ctx.textAlign = "right";
+      ctx.fillStyle = "rgba(234,240,255,.95)";
+      ctx.font = `900 ${Math.max(12, Math.floor(radius*0.06))}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+      const label = `${p.emoji} ${shortLabel(p.label)}`;
+      ctx.fillText(label, radius - 14, 6);
+      ctx.restore();
+    }
+
+    // center cap
+    ctx.beginPath();
+    ctx.arc(0,0,Math.max(42, radius*0.18),0,Math.PI*2);
+    ctx.fillStyle = "rgba(0,0,0,.22)";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(255,255,255,.14)";
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(234,240,255,.95)";
+    ctx.font = `1000 ${Math.max(14, Math.floor(radius*0.08))}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+    ctx.textAlign = "center";
+    ctx.fillText("SPIN", 0, 7);
+
+    ctx.restore();
+  }
+
+  function easeOutCubic(t){ return 1 - Math.pow(1-t,3); }
+
+  async function spinToPrize(prize){
+    const n = PRIZES.length;
+    const arc = (Math.PI*2)/n;
+    const idx = PRIZES.findIndex(x=>x.id===prize.id);
+
+    const pointerAngle = -Math.PI/2;
+    const sliceCenter = idx*arc + arc/2;
+    const baseTarget = pointerAngle - sliceCenter;
+
+    const extraTurns = 7 + Math.floor(Math.random()*4); // 7..10
+    const targetRotation = baseTarget + extraTurns * Math.PI*2;
+
+    const start = currentRotation;
+    const delta = targetRotation - start;
+
+    const duration = 4200 + Math.random()*700;
+    const t0 = performance.now();
+
+    // tiny tick sound effect (vibration-like) via visual only (no audio)
+    return new Promise(resolve=>{
+      function frame(now){
+        const t = Math.min(1,(now-t0)/duration);
+        const k = easeOutCubic(t);
+        currentRotation = start + delta*k;
+        drawWheel(currentRotation);
+        if(t<1) requestAnimationFrame(frame);
+        else resolve();
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
+  // ====== Confetti (simple fireworks) ======
+  let confetti = [];
+  let confettiRAF = null;
+
+  function resizeConfetti(){
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    confettiCanvas.width = Math.floor(window.innerWidth * dpr);
+    confettiCanvas.height = Math.floor(window.innerHeight * dpr);
+    confettiCanvas.style.width = window.innerWidth + "px";
+    confettiCanvas.style.height = window.innerHeight + "px";
+    cctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener("resize", resizeConfetti);
+
+  function launchConfetti(){
+    resizeConfetti();
+    confettiCanvas.classList.add("show");
+
+    const W = window.innerWidth, H = window.innerHeight;
+    const originX = W*0.5;
+    const originY = Math.min(H*0.45, 380);
+
+    confetti = [];
+    const count = 220;
+    for(let i=0;i<count;i++){
+      const angle = Math.random()*Math.PI*2;
+      const speed = 2.5 + Math.random()*5.5;
+      confetti.push({
+        x: originX,
+        y: originY,
+        vx: Math.cos(angle)*speed,
+        vy: Math.sin(angle)*speed - (2.5 + Math.random()*2),
+        g: 0.08 + Math.random()*0.08,
+        s: 3 + Math.random()*4,
+        r: Math.random()*Math.PI,
+        vr: (-0.2 + Math.random()*0.4),
+        a: 1,
+        color: `hsl(${(280 + Math.random()*140) % 360} 90% 60%)`
+      });
+    }
+
+    let t = 0;
+    cancelAnimationFrame(confettiRAF);
+    function step(){
+      t++;
+      cctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+
+      for(const p of confetti){
+        p.vy += p.g;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.r += p.vr;
+        p.a *= 0.992;
+
+        cctx.save();
+        cctx.globalAlpha = Math.max(0, p.a);
+        cctx.translate(p.x, p.y);
+        cctx.rotate(p.r);
+        cctx.fillStyle = p.color;
+        cctx.fillRect(-p.s/2, -p.s/2, p.s, p.s*1.4);
+        cctx.restore();
+      }
+
+      confetti = confetti.filter(p=>p.a>0.06 && p.y < window.innerHeight+60);
+
+      if(t < 170 && confetti.length){
+        confettiRAF = requestAnimationFrame(step);
+      }else{
+        cctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+        confettiCanvas.classList.remove("show");
+      }
+    }
+    step();
+  }
+
+  // ====== Modal ======
+  function openModal(){ overlay.classList.add("show"); }
+  function closeModal(){ overlay.classList.remove("show"); }
+  $("closeModal").addEventListener("click", closeModal);
+  overlay.addEventListener("click", (e)=>{ if(e.target===overlay) closeModal(); });
+
+  $("copyBtn").addEventListener("click", async ()=>{
+    if(!lastWin) return;
+    try{
+      await navigator.clipboard.writeText(lastWin.claimId);
+      // little success pulse
+      $("copyBtn").style.filter = "brightness(1.05)";
+      setTimeout(()=>$("copyBtn").style.filter="", 160);
+      alert("Claim ID скопирован ✅");
+    }catch{
+      alert("Не удалось скопировать. Claim ID: " + lastWin.claimId);
+    }
+  });
+
+  $("claimBtn").addEventListener("click", ()=>{
+    if(!lastWin) return;
+    const nick = (nickInput.value||"").trim();
+    if(!nick){
+      nickField.classList.add("shake");
+      setTimeout(()=>nickField.classList.remove("shake"), 380);
+      return;
+    }
+    const text = buildTelegramText(lastWin);
+    openTelegram(SALES_USERNAME, text);
+  });
+
+  // ====== Buttons ======
+  $("howBtn").addEventListener("click", ()=>{
+    alert("Как работает:\n\n1) Вводишь промокод\n2) Жмёшь «Крутить»\n3) Если выиграл — появится Claim ID\n4) «Забрать приз» откроет Telegram с сообщением для менеджера\n\nВажно: для 100% защиты от подделки делаем проверку через бота (следующий шаг).");
+  });
+  $("oddsBtn").addEventListener("click", ()=>{
+    const list = PRIZES
+      .slice()
+      .sort((a,b)=>a.weight-b.weight)
+      .map(p=>`${p.label} — ${p.weight}%`)
+      .join("\n");
+    alert("Шансы (по возрастанию редкости):\n\n" + list);
+  });
+
+  // ====== Spin ======
+  spinBtn.addEventListener("click", async ()=>{
+    if(spinning) return;
+
+    const promo = (promoInput.value||"").trim();
+    const check = isPromoAllowed(promo);
+    if(!check.ok){
+      promoField.classList.add("shake");
+      setTimeout(()=>promoField.classList.remove("shake"), 380);
+      return;
+    }
+
+    spinning = true;
+    spinBtn.disabled = true;
+    spinBtn.textContent = "Крутим…";
+
+    const prize = pickWeighted();
+    const claimId = genClaimId();
+    const ts = Date.now();
+
+    await spinToPrize(prize);
+
+    markPromoUsed(promo);
+
+    lastWin = { prize, claimId, promo, ts };
+
+    winTitle.textContent = prize.label;
+    winDesc.textContent = prize.desc;
+    claimBox.textContent = "Claim ID: " + claimId;
+
+    // fireworks/confetti
+    launchConfetti();
+    openModal();
+
+    spinBtn.textContent = "Крутить";
+    spinBtn.disabled = false;
+    spinning = false;
+  });
+
+  promoInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter") spinBtn.click(); });
+  nickInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter") { if(lastWin) $("claimBtn").click(); else spinBtn.click(); }});
+
+  // init
+  fitCanvas();
+  drawWheel(currentRotation);
+
+  // ====== promo functions reused ======
+  function isPromoAllowed(promo){
+    promo = (promo||"").trim();
+    if(!promo) return { ok:false, reason:"Введите промокод." };
+    if(promo === ADMIN_PROMO) return { ok:true, admin:true };
+    if(!PROMOS.includes(promo)) return { ok:false, reason:"Неверный промокод." };
+    if(localStorage.getItem(promoUsedKey(promo)) === "1") return { ok:false, reason:"Этот промокод уже использован на этом устройстве." };
+    return { ok:true, admin:false };
+  }
+  function promoUsedKey(p){ return `ds_promo_used_${p}`; }
+  function markPromoUsed(promo){
+    if(promo === ADMIN_PROMO) return;
+    localStorage.setItem(promoUsedKey(promo), "1");
+  }
+</script>
+</body>
+  </html>
