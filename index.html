@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Neon Jump</title>
+  <style>
+    :root{
+      --bg1:#0b0f1a;
+      --bg2:#121a2b;
+      --panel: rgba(255,255,255,.06);
+      --panel2: rgba(255,255,255,.09);
+      --stroke: rgba(255,255,255,.12);
+      --text: rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.65);
+      --neo:  #8C7CFF;
+      --neo2: #4CE6FF;
+      --gold: #FFD76A;
+      --bad:  #FF7C9C;
+      --warn: #FFD37C;
+      --good: #7CFFB2;
+    }
+    *{box-sizing:border-box}
+    html,body{
+      height:100%; margin:0; overflow:hidden;
+      background:
+        radial-gradient(1200px 700px at 20% 10%, #1a1f3a, transparent 60%),
+        radial-gradient(900px 600px at 85% 25%, #123a4a, transparent 55%),
+        linear-gradient(180deg,var(--bg1),var(--bg2));
+      color:var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    .wrap{height:100%; display:flex; align-items:center; justify-content:center; padding:0;}
+    .frame{
+      position:relative; width:100vw; height:100vh;
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      touch-action:none; overflow:hidden;
+    }
+    canvas{width:100%; height:100%; display:block; touch-action:none;}
+
+    .hud{
+      position:absolute; inset:0; pointer-events:none;
+      padding: max(10px, env(safe-area-inset-top)) 10px 0 10px;
+      display:flex; flex-direction:column; gap:8px;
+    }
+    .topbar{display:flex; flex-direction:column; gap:8px; align-items:stretch;}
+    .pill{
+      pointer-events:none;
+      padding:10px 12px; border-radius:999px;
+      background:var(--panel); border:1px solid var(--stroke);
+      backdrop-filter: blur(10px);
+      display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; row-gap:6px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      font-weight:750; letter-spacing:.2px;
+    }
+    .pill small{font-weight:650; color:var(--muted)}
+    .btnbar{display:flex; gap:10px; pointer-events:auto;}
+    .btn{
+      cursor:pointer; user-select:none; flex:1;
+      padding:11px 12px; border-radius:16px;
+      background: linear-gradient(180deg, var(--panel2), var(--panel));
+      border:1px solid var(--stroke);
+      color:var(--text);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      font-weight:900;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      transition:.12s transform ease, .12s filter ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active{transform: translateY(1px) scale(.99); filter:brightness(.95)}
+    .dot{width:9px; height:9px; border-radius:50%; background:var(--neo2); box-shadow:0 0 14px rgba(76,230,255,.7)}
+
+    .toast{
+      position:absolute; left:50%;
+      bottom: calc(110px + max(10px, env(safe-area-inset-bottom)));
+      transform:translateX(-50%);
+      padding:10px 12px; border-radius:999px;
+      background: rgba(0,0,0,.45);
+      border: 1px solid rgba(255,255,255,.14);
+      color: rgba(255,255,255,.92);
+      font-size: 13px;
+      pointer-events:none;
+      opacity:0;
+      transition:.18s opacity ease;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 50px rgba(0,0,0,.35);
+      max-width: calc(100% - 24px);
+      text-align:center;
+      line-height:1.25;
+    }
+    .toast.on{opacity:1}
+
+    /* Modal shop */
+    .modal{
+      position:absolute; inset:0;
+      display:none; align-items:center; justify-content:center;
+      padding:14px;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(10px);
+      pointer-events:auto;
+    }
+    .modal.on{display:flex}
+    .card{
+      width:min(820px, 100%);
+      max-height: calc(100% - 28px);
+      overflow:auto;
+      border-radius:22px;
+      background: linear-gradient(180deg, rgba(18,26,43,.92), rgba(10,14,25,.92));
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow: 0 30px 90px rgba(0,0,0,.55);
+      padding:14px;
+    }
+    .card h2{margin:0; font-size:18px; letter-spacing:.2px}
+    .sub{color:var(--muted); font-size:13px; margin:6px 0 10px}
+    .close{
+      position:sticky; top:0;
+      display:flex; justify-content:space-between; align-items:center;
+      gap:10px; padding:8px 2px 12px;
+      background: linear-gradient(180deg, rgba(18,26,43,.98), rgba(18,26,43,.45));
+      backdrop-filter: blur(8px);
+      border-bottom:1px solid rgba(255,255,255,.08);
+      margin-bottom:12px;
+    }
+    .right{display:flex; gap:10px; align-items:center}
+    .kbd{font-size:12px; color:var(--muted); border:1px solid rgba(255,255,255,.14); padding:4px 8px; border-radius:10px; background:rgba(255,255,255,.05)}
+    .grid{display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px;}
+    @media (max-width:720px){ .grid{grid-template-columns:1fr;} }
+    .item{
+      padding:12px; border-radius:18px;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      display:flex; flex-direction:column; gap:8px;
+    }
+    .head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+    .tag{font-size:12px; color:rgba(255,255,255,.75); padding:4px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.05)}
+    .price{font-weight:950; color:var(--gold); text-shadow:0 0 16px rgba(255,215,106,.25)}
+    .mini{
+      cursor:pointer; user-select:none;
+      padding:9px 10px; border-radius:12px;
+      background: linear-gradient(180deg, rgba(140,124,255,.25), rgba(76,230,255,.14));
+      border:1px solid rgba(255,255,255,.14);
+      color:var(--text); font-weight:950;
+      transition:.12s transform ease, .12s filter ease;
+      white-space:nowrap;
+    }
+    .mini:active{transform: translateY(1px) scale(.99); filter:brightness(.95)}
+    .mini:disabled{opacity:.45; cursor:not-allowed}
+
+    /* Touch controls */
+    .touch{position:absolute; inset:0; pointer-events:none; display:block;}
+    .pad{
+      position:absolute; left:10px;
+      bottom: max(10px, env(safe-area-inset-bottom));
+      pointer-events:auto;
+      display:flex; gap:10px;
+    }
+    .tbtn{
+      width:72px; height:72px; border-radius:22px;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.14);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      display:flex; align-items:center; justify-content:center;
+      font-weight:1000; color: rgba(255,255,255,.92);
+      user-select:none;
+      -webkit-tap-highlight-color: transparent;
+      font-size:20px;
+    }
+    .tbtn:active{filter:brightness(.92)}
+    .hintMini{
+      position:absolute; right:10px;
+      bottom: max(10px, env(safe-area-inset-bottom));
+      pointer-events:auto;
+      width:72px; height:72px; border-radius:22px;
+      background: linear-gradient(180deg, rgba(140,124,255,.28), rgba(76,230,255,.16));
+      border:1px solid rgba(255,255,255,.16);
+      display:flex; align-items:center; justify-content:center;
+      font-weight:1000; color: rgba(255,255,255,.95);
+      box-shadow: 0 18px 45px rgba(0,0,0,.35);
+      user-select:none;
+      -webkit-tap-highlight-color: transparent;
+      font-size:20px;
+    }
+    .hintMini:active{filter:brightness(.92)}
+
+    /* Desktop: рамка 16/9 и без тач-кнопок */
+    @media (min-width: 900px){
+      .wrap{padding:12px}
+      .frame{
+        width:min(980px, 100%);
+        height:auto;
+        aspect-ratio:16/9;
+        border-radius:24px;
+        border:1px solid var(--stroke);
+        box-shadow: 0 25px 80px rgba(0,0,0,.45);
+      }
+      .touch{display:none}
+      .toast{bottom:14px}
+      .hud{padding:14px}
+      .topbar{flex-direction:row; align-items:center; justify-content:space-between;}
+      .btnbar{width:auto}
+      .btn{flex:0 0 auto; padding:10px 12px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="frame">
+      <canvas id="c"></canvas>
+
+      <div class="hud">
+        <div class="topbar">
+          <div class="pill">
+            <span>⬆️ <small>Высота</small> <span id="uiScore">0</span></span>
+            <span>🪙 <small>Монеты</small> <span id="uiCoins">0</span></span>
+            <span>🏆 <small>Рекорд</small> <span id="uiBest">0</span></span>
+          </div>
+
+          <div class="btnbar">
+            <div class="btn" id="btnShop"><span class="dot"></span>Магазин</div>
+            <div class="btn" id="btnRestart"><span class="dot" style="background:var(--bad)"></span>Рестарт</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="toast" id="toast">Текст</div>
+
+      <div class="touch">
+        <div class="pad">
+          <div class="tbtn" id="tLeft">◀</div>
+          <div class="tbtn" id="tRight">▶</div>
+        </div>
+        <div class="hintMini" id="tInfo">i</div>
+      </div>
+
+      <div class="modal" id="modal">
+        <div class="card">
+          <div class="close">
+            <div>
+              <h2>Магазин</h2>
+              <div class="sub">Покупки сохраняются. Игра — бесконечная вверх.</div>
+            </div>
+            <div class="right">
+              <div class="pill" style="pointer-events:none; width:auto">
+                🪙 <small>Монеты</small> <span id="uiCoins2">0</span>
+              </div>
+              <div class="kbd">Esc</div>
+              <div class="btn" id="btnClose"><span class="dot"></span>Закрыть</div>
+            </div>
+          </div>
+
+          <div class="grid" id="shopGrid"></div>
+
+          <div style="height:10px"></div>
+          <div class="sub">Управление: влево/вправо. Прыжок автоматом при приземлении.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ===== Canvas =====
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+
+  const uiScore = document.getElementById('uiScore');
+  const uiCoins = document.getElementById('uiCoins');
+  const uiBest  = document.getElementById('uiBest');
+  const uiCoins2= document.getElementById('uiCoins2');
+  const toastEl = document.getElementById('toast');
+
+  const btnShop = document.getElementById('btnShop');
+  const btnRestart = document.getElementById('btnRestart');
+  const modal = document.getElementById('modal');
+  const btnClose = document.getElementById('btnClose');
+  const shopGrid = document.getElementById('shopGrid');
+
+  const tLeft = document.getElementById('tLeft');
+  const tRight = document.getElementById('tRight');
+  const tInfo = document.getElementById('tInfo');
+
+  const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  function resize(){
+    const r = canvas.getBoundingClientRect();
+    canvas.width = Math.floor(r.width * DPR);
+    canvas.height = Math.floor(r.height * DPR);
+  }
+  addEventListener('resize', resize, {passive:true});
+  resize();
+
+  // ===== Utils =====
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const rand = (a,b)=>a+Math.random()*(b-a);
+  const irand = (a,b)=>Math.floor(rand(a,b+1));
+  const now = ()=>performance.now();
+
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('on');
+    clearTimeout(toastEl._t);
+    toastEl._t = setTimeout(()=>toastEl.classList.remove('on'), 1400);
+  }
+
+  // ===== Save =====
+  const SAVE_KEY = 'neon_jump_save_v1';
+  const defaultSave = ()=>({
+    coins:0,
+    best:0,
+    upgrades:{
+      speed:0,      // horizontal speed
+      jump:0,       // jump strength
+      shield:0,     // extra lives
+      magnet:0      // coin magnet radius
+    }
+  });
+
+  function loadSave(){
+    try{
+      const raw = localStorage.getItem(SAVE_KEY);
+      if(!raw) return defaultSave();
+      const s = JSON.parse(raw);
+      const b = defaultSave();
+      s.coins = Number(s.coins ?? b.coins) || 0;
+      s.best = Number(s.best ?? b.best) || 0;
+      s.upgrades = {...b.upgrades, ...(s.upgrades||{})};
+      return s;
+    }catch{ return defaultSave(); }
+  }
+  let SAVE = loadSave();
+  const saveNow = ()=>localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE));
+
+  // ===== Input =====
+  const keys = new Set();
+  addEventListener('keydown', (e)=>{
+    if (e.key === 'Escape' && modal.classList.contains('on')) closeShop();
+    if (modal.classList.contains('on')) return;
+    keys.add(e.key.toLowerCase());
+  });
+  addEventListener('keyup', (e)=>keys.delete(e.key.toLowerCase()));
+  const leftDown = ()=>keys.has('a')||keys.has('arrowleft');
+  const rightDown= ()=>keys.has('d')||keys.has('arrowright');
+
+  const touchState = {left:false, right:false};
+  function bindHold(el, key){
+    const on=(e)=>{e.preventDefault(); touchState[key]=true;};
+    const off=(e)=>{e.preventDefault(); touchState[key]=false;};
+    el.addEventListener('pointerdown', on, {passive:false});
+    el.addEventListener('pointerup', off, {passive:false});
+    el.addEventListener('pointercancel', off, {passive:false});
+    el.addEventListener('pointerleave', off, {passive:false});
+  }
+  bindHold(tLeft, 'left');
+  bindHold(tRight,'right');
+  tInfo.addEventListener('click', ()=>toast('Управление: ◀▶. Прыжок автоматом при приземлении. Не падай вниз!'));
+
+  // ===== Shop =====
+  const shopItems = [
+    {id:'speed', name:'Скорость', tag:'Контроль', desc:'Быстрее влево/вправо.', base:70, scale:1.6, max:6},
+    {id:'jump',  name:'Прыжок',   tag:'Высота',   desc:'Сильнее отталкивание от платформ.', base:90, scale:1.7, max:6},
+    {id:'shield',name:'Щит',      tag:'Сейв',     desc:'+1 жизнь (если упал ниже экрана).', base:180, scale:2.0, max:3},
+    {id:'magnet',name:'Магнит',   tag:'Фарм',     desc:'Монеты тянутся к тебе.', base:110, scale:1.75, max:5},
+  ];
+  const up = (id)=>SAVE.upgrades[id]||0;
+  const costFor = (item)=>Math.floor(item.base * Math.pow(item.scale, up(item.id)));
+
+  function renderShop(){
+    shopGrid.innerHTML='';
+    for(const item of shopItems){
+      const lvl = up(item.id);
+      const maxed = lvl>=item.max;
+      const price = costFor(item);
+
+      const el = document.createElement('div');
+      el.className='item';
+      el.innerHTML=`
+        <div class="head">
+          <div>
+            <b>${item.name} <span style="color:rgba(255,255,255,.55)">LVL ${lvl}/${item.max}</span></b>
+            <div style="height:6px"></div>
+            <span class="tag">${item.tag}</span>
+          </div>
+          <div class="price">🪙 ${maxed?'MAX':price}</div>
+        </div>
+        <div style="color:rgba(255,255,255,.7); font-size:12.5px; line-height:1.35">${item.desc}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:4px;">
+          <div style="color:rgba(255,255,255,.7); font-size:12px">
+            ${maxed?'Уже куплено.':(SAVE.coins>=price?'Доступно ✅':'Не хватает 🥲')}
+          </div>
+          <button class="mini" ${maxed||SAVE.coins<price?'disabled':''}>Купить</button>
+        </div>
+      `;
+      el.querySelector('button').addEventListener('click', ()=>{
+        if (up(item.id)>=item.max) return;
+        const cost = costFor(item);
+        if (SAVE.coins<cost) return;
+        SAVE.coins -= cost;
+        SAVE.upgrades[item.id] = up(item.id)+1;
+        applyUpgrades();
+        saveNow();
+        syncUI();
+        renderShop();
+        toast(`Куплено: ${item.name}`);
+      });
+      shopGrid.appendChild(el);
+    }
+  }
+
+  function openShop(){ modal.classList.add('on'); renderShop(); }
+  function closeShop(){ modal.classList.remove('on'); }
+  btnShop.addEventListener('click', openShop);
+  btnClose.addEventListener('click', closeShop);
+
+  // ===== Game params =====
+  const world = { w: 420, h: 780 }; // will be set to canvas size in "fit"
+  const stats = {
+    speed: 5.4,
+    jump: 16.0,
+    gravity: 0.62,
+    magnet: 0,
+    lives: 0
+  };
+
+  function applyUpgrades(){
+    stats.speed = 5.4 + up('speed')*0.85;
+    stats.jump  = 16.0 + up('jump')*1.1;
+    stats.magnet= 0 + up('magnet')*52;
+    stats.lives = up('shield');
+  }
+  applyUpgrades();
+
+  function fitWorld(){
+    const w = canvas.width / DPR;
+    const h = canvas.height / DPR;
+    world.w = w;
+    world.h = h;
+  }
+  fitWorld();
+  addEventListener('resize', fitWorld, {passive:true});
+
+  // ===== Entities =====
+  const player = {
+    x: 200, y: 520,
+    w: 28, h: 28,
+    vx: 0, vy: 0,
+    alive: true
+  };
+
+  // platforms: {x,y,w,h,type, vx, broken, hit}
+  // type: 'normal' | 'move' | 'break'
+  let platforms = [];
+  let coins = []; // {x,y,r,taken}
+  let cameraY = 0;
+  let score = 0;
+  let bestRun = 0;
+  let lives = 0;
+
+  function resetGame(){
+    fitWorld();
+    applyUpgrades();
+
+    player.x = world.w/2 - player.w/2;
+    player.y = world.h*0.65;
+    player.vx = 0; player.vy = -stats.jump*0.8;
+
+    cameraY = 0;
+    score = 0;
+    bestRun = 0;
+    lives = stats.lives;
+
+    platforms = [];
+    coins = [];
+
+    // стартовая платформа
+    platforms.push(makePlatform(world.w/2 - 70, world.h - 90, 140, 16, 'normal'));
+
+    // сгенерим вверх заранее
+    let y = world.h - 160;
+    for(let i=0;i<26;i++){
+      const diff = i/26; // плавно усложняем
+      y -= irand(55, 88) + diff*30;
+      spawnChunk(y, diff);
+    }
+
+    toast('Поехали вверх 🚀');
+    syncUI();
+  }
+
+  function makePlatform(x,y,w,h,type){
+    return {
+      x,y,w,h,
+      type,
+      vx: (type==='move' ? (Math.random()<0.5?-1:1) * rand(0.7, 1.6) : 0),
+      broken:false,
+      hit:false
+    };
+  }
+
+  function spawnChunk(targetY, diff){
+    // diff 0..1 : больше разрывов/ловушек
+    const pad = 18;
+    const minW = 85;
+    const maxW = 150;
+    const w = clamp(irand(minW, maxW) - Math.floor(diff*20), 70, 160);
+    const x = irand(pad, Math.max(pad, Math.floor(world.w - w - pad)));
+    const typeRoll = Math.random();
+
+    let type='normal';
+    const moveChance  = 0.10 + diff*0.10; // 10-20%
+    const breakChance = 0.10 + diff*0.18; // 10-28%
+    if (typeRoll < moveChance) type='move';
+    else if (typeRoll < moveChance + breakChance) type='break';
+
+    platforms.push(makePlatform(x, targetY, w, 14, type));
+
+    // coins иногда над платформой
+    const coinChance = 0.55;
+    if (Math.random() < coinChance){
+      const n = irand(1, 4);
+      for(let i=0;i<n;i++){
+        coins.push({x: x + w/2 + (i-(n-1)/2)*18, y: targetY-22, r: 8, taken:false});
+      }
+    }
+  }
+
+  btnRestart.addEventListener('click', resetGame);
+
+  // ===== Physics & collisions =====
+  function aabb(ax,ay,aw,ah, bx,by,bw,bh){
+    return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
+  }
+
+  function onLand(platform){
+    // авто-прыжок
+    if (platform.type === 'break'){
+      platform.broken = true;
+      platform.hit = true;
+      player.vy = -stats.jump * 0.85; // чуть слабее
+      toast('Ломается 💥');
+    } else {
+      player.vy = -stats.jump;
+    }
+  }
+
+  // ===== Loop =====
+  let last = now();
+
+  function syncUI(){
+    uiScore.textContent = Math.floor(score);
+    uiCoins.textContent = SAVE.coins;
+    uiCoins2.textContent = SAVE.coins;
+    uiBest.textContent = Math.floor(SAVE.best || 0);
+  }
+
+  function step(dt){
+    // input
+    const L = leftDown() || touchState.left;
+    const R = rightDown() || touchState.right;
+
+    const target = (R?1:0) - (L?1:0);
+    player.vx += target * (stats.speed*0.35) * dt;
+    player.vx *= Math.pow(0.86, dt);
+    player.vx = clamp(player.vx, -stats.speed, stats.speed);
+
+    // move
+    player.x += player.vx * dt;
+
+    // wrap left/right (как в doodle)
+    if (player.x < -player.w) player.x = world.w;
+    if (player.x > world.w) player.x = -player.w;
+
+    // gravity
+    player.vy += stats.gravity * dt;
+    player.y += player.vy * dt;
+
+    // move platforms
+    for (const p of platforms){
+      if (p.type==='move'){
+        p.x += p.vx * 2.2 * dt;
+        if (p.x < 10){ p.x=10; p.vx *= -1; }
+        if (p.x + p.w > world.w-10){ p.x=world.w-10-p.w; p.vx*=-1; }
+      }
+    }
+
+    // collision only when falling
+    if (player.vy > 0){
+      for (const p of platforms){
+        if (p.broken) continue;
+        // check "feet" zone for nicer landing
+        const feetY = player.y + player.h;
+        const prevFeetY = feetY - player.vy * dt;
+        const withinX = player.x + player.w > p.x && player.x < p.x + p.w;
+        const crossed = prevFeetY <= p.y && feetY >= p.y;
+        const closeY = Math.abs((player.y + player.h) - p.y) < 18;
+
+        if (withinX && crossed && closeY){
+          // land
+          player.y = p.y - player.h;
+          onLand(p);
+          break;
+        }
+      }
+    }
+
+    // camera follows upward only
+    const upperLine = world.h * 0.38;
+    if (player.y < upperLine){
+      const dy = (upperLine - player.y);
+      player.y = upperLine;
+      cameraY += dy;
+
+      // shift world down
+      for (const p of platforms) p.y += dy;
+      for (const c of coins) c.y += dy;
+    }
+
+    // score = cameraY max
+    score = Math.max(score, cameraY);
+    bestRun = Math.max(bestRun, score);
+
+    // coins pickup + magnet
+    const cx = player.x + player.w/2;
+    const cy = player.y + player.h/2;
+
+    for (const c of coins){
+      if (c.taken) continue;
+      if (stats.magnet > 0){
+        const dx = c.x - cx, dy = c.y - cy;
+        const d2 = dx*dx + dy*dy;
+        if (d2 < stats.magnet*stats.magnet){
+          c.x -= dx * 0.10 * dt;
+          c.y -= dy * 0.10 * dt;
+        }
+      }
+      if (aabb(player.x, player.y, player.w, player.h, c.x-c.r, c.y-c.r, c.r*2, c.r*2)){
+        c.taken = true;
+        SAVE.coins += 1;
+      }
+    }
+
+    // clean below screen and spawn new above
+    // keep platforms count stable
+    platforms = platforms.filter(p => p.y < world.h + 120 && !(p.broken && p.y > world.h + 40));
+    coins = coins.filter(c => !c.taken && c.y < world.h + 140);
+
+    // find highest platform y (smallest y)
+    let minY = Infinity;
+    for (const p of platforms) minY = Math.min(minY, p.y);
+
+    // spawn up until enough
+    while (minY > -220){
+      const diff = clamp(score / 2800, 0, 1);
+      minY -= irand(58, 92) + diff*34;
+      spawnChunk(minY, diff);
+    }
+
+    // fall death
+    if (player.y > world.h + 80){
+      if (lives > 0){
+        lives -= 1;
+        toast(`Щит спас! Осталось: ${lives}`);
+        // respawn near top-ish
+        player.y = world.h*0.45;
+        player.vy = -stats.jump*0.9;
+      } else {
+        // game over: save best
+        SAVE.best = Math.max(SAVE.best || 0, Math.floor(bestRun));
+        saveNow();
+        toast('Game Over 😵 (жми Рестарт)');
+        resetGame(); // сразу рестарт, чтоб не зависать
+      }
+    }
+
+    // ui
+    SAVE.best = Math.max(SAVE.best || 0, Math.floor(bestRun));
+    saveNow();
+    syncUI();
+  }
+
+  // ===== Draw =====
+  function clear(){
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+  }
+
+  function roundRect(x,y,w,h,r){
+    r = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y, x+w,y+h, r);
+    ctx.arcTo(x+w,y+h, x,y+h, r);
+    ctx.arcTo(x,y+h, x,y, r);
+    ctx.arcTo(x,y, x+w,y, r);
+    ctx.closePath();
+  }
+
+  function draw(){
+    clear();
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    const W = canvas.width / DPR;
+    const H = canvas.height / DPR;
+
+    // background grid
+    ctx.save();
+    ctx.globalAlpha = 0.23;
+    ctx.fillStyle = 'rgba(255,255,255,.03)';
+    for (let gx=0; gx<W; gx+=28) ctx.fillRect(gx, 0, 1, H);
+    for (let gy=0; gy<H; gy+=28) ctx.fillRect(0, gy, W, 1);
+    ctx.restore();
+
+    // stars
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    for (let i=0;i<70;i++){
+      const sx = (i*97.3 + score*0.05) % (W+120) - 60;
+      const sy = (i*53.7 + score*0.12) % H;
+      ctx.fillStyle = 'rgba(255,255,255,.55)';
+      ctx.fillRect(sx, sy, 2, 2);
+    }
+    ctx.restore();
+
+    // platforms
+    for (const p of platforms){
+      if (p.broken) continue;
+      let fill = 'rgba(255,255,255,.10)';
+      let edge = 'rgba(255,255,255,.16)';
+
+      if (p.type==='move'){
+        fill = 'rgba(76,230,255,.12)';
+        edge = 'rgba(76,230,255,.22)';
+      } else if (p.type==='break'){
+        fill = 'rgba(255,124,156,.10)';
+        edge = 'rgba(255,124,156,.22)';
+      }
+
+      roundRect(p.x, p.y, p.w, p.h, 10);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = edge;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.shadowColor = (p.type==='break') ? 'rgba(255,124,156,.55)' : 'rgba(76,230,255,.55)';
+      ctx.shadowBlur = 14;
+      ctx.strokeStyle = (p.type==='break') ? 'rgba(255,124,156,.20)' : 'rgba(76,230,255,.20)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // coins
+    for (const c of coins){
+      ctx.save();
+      ctx.fillStyle = 'rgba(255,215,106,.95)';
+      ctx.shadowColor = 'rgba(255,215,106,.75)';
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, c.r, 0, Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = 'rgba(255,255,255,.9)';
+      ctx.beginPath();
+      ctx.arc(c.x-3, c.y-3, c.r*0.35, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // player (square)
+    ctx.save();
+    ctx.shadowColor = 'rgba(76,230,255,.30)';
+    ctx.shadowBlur = 18;
+    roundRect(player.x, player.y, player.w, player.h, 10);
+    ctx.fillStyle = 'rgba(140,124,255,.95)';
+    ctx.fill();
+
+    // little stripe
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.fillRect(player.x+6, player.y+10, player.w-12, 2);
+
+    // lives ring
+    if (lives > 0){
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = 'rgba(124,255,178,.85)';
+      ctx.shadowColor = 'rgba(124,255,178,.65)';
+      ctx.shadowBlur = 18;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(player.x+player.w/2, player.y+player.h/2, Math.max(player.w,player.h)*0.78, 0, Math.PI*2);
+      ctx.stroke();
+    }
+
+    // magnet ring
+    if (stats.magnet > 0){
+      ctx.globalAlpha = 0.14;
+      ctx.strokeStyle = 'rgba(255,215,106,.9)';
+      ctx.shadowColor = 'rgba(255,215,106,.5)';
+      ctx.shadowBlur = 20;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(player.x+player.w/2, player.y+player.h/2, stats.magnet, 0, Math.PI*2);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+
+    // small bottom text (desktop helpful)
+    ctx.save();
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.font = '12px system-ui';
+    ctx.fillText('A/D или ◀▶ — движение. Прыжок автоматом.', 12, H-12);
+    ctx.restore();
+  }
+
+  // ===== Shop open/close key =====
+  addEventListener('keydown', (e)=>{
+    if (e.key.toLowerCase()==='b') openShop();
+  });
+
+  // ===== Start =====
+  function openShop(){ modal.classList.add('on'); renderShop(); }
+  function closeShop(){ modal.classList.remove('on'); }
+
+  resetGame();
+
+  function loop(){
+    const t = now();
+    let dt = (t - last) / 16.666;
+    dt = clamp(dt, 0.5, 2.2);
+    last = t;
+
+    if (!modal.classList.contains('on')) step(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  loop();
+
+})();
+</script>
+</body>
+                                                                       </html>
