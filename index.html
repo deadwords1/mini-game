@@ -1,0 +1,1569 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+  <title>Ball Blast: Neon Pets</title>
+  <style>
+    :root{
+      --bg1:#0b0f1a; --bg2:#121a2b;
+      --panel: rgba(255,255,255,.06);
+      --panel2: rgba(255,255,255,.10);
+      --stroke: rgba(255,255,255,.12);
+      --text: rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.65);
+      --neo:#8C7CFF; --neo2:#4CE6FF; --gold:#FFD76A;
+      --bad:#FF4E78; --good:#7CFFB2; --vio:#B076FF;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;overflow:hidden;background:linear-gradient(180deg,var(--bg1),var(--bg2));color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+    .frame{position:fixed; inset:0; touch-action:none; overflow:hidden;
+      background:
+        radial-gradient(900px 600px at 20% 15%, rgba(140,124,255,.20), transparent 60%),
+        radial-gradient(900px 600px at 85% 25%, rgba(76,230,255,.15), transparent 55%),
+        linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+    }
+    canvas{width:100%;height:100%;display:block;touch-action:none}
+
+    .hud{
+      position:absolute; left:0; right:0; top:0;
+      padding: max(8px, env(safe-area-inset-top)) 10px 0 10px;
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      z-index:5; pointer-events:none;
+    }
+    .pill{
+      pointer-events:none;
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+      padding:10px 12px; min-height:40px;
+      border-radius:999px;
+      background:var(--panel);
+      border:1px solid var(--stroke);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      font-weight:950; letter-spacing:.2px;
+    }
+    .pill small{font-weight:800; color:var(--muted)}
+    .btns{display:flex; gap:10px; pointer-events:auto}
+    .btn{
+      height:40px; padding:0 12px; border-radius:16px;
+      background: linear-gradient(180deg, var(--panel2), var(--panel));
+      border:1px solid var(--stroke);
+      color:var(--text);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      font-weight:1000; display:flex; align-items:center; justify-content:center; gap:8px;
+      user-select:none; cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+      transition:.12s transform ease,.12s filter ease;
+    }
+    .btn:active{transform:translateY(1px) scale(.99); filter:brightness(.95)}
+    .dot{width:9px;height:9px;border-radius:50%;background:var(--neo2);box-shadow:0 0 14px rgba(76,230,255,.7)}
+
+    .toast{
+      position:absolute; left:50%;
+      bottom: max(10px, env(safe-area-inset-bottom));
+      transform:translateX(-50%);
+      padding:10px 12px; border-radius:999px;
+      background: rgba(0,0,0,.45);
+      border: 1px solid rgba(255,255,255,.14);
+      color: rgba(255,255,255,.92);
+      font-size: 13px; pointer-events:none;
+      opacity:0; transition:.18s opacity ease;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 50px rgba(0,0,0,.35);
+      max-width: calc(100% - 24px);
+      text-align:center; line-height:1.25;
+      z-index:9;
+    }
+    .toast.on{opacity:1}
+
+    /* Start overlay */
+    .start{
+      position:absolute; inset:0; z-index:8;
+      display:flex; align-items:center; justify-content:center;
+      padding:16px;
+      background: rgba(0,0,0,.25);
+      backdrop-filter: blur(6px);
+    }
+    .card{
+      width:min(560px,100%);
+      border-radius:24px;
+      background: linear-gradient(180deg, rgba(18,26,43,.92), rgba(10,14,25,.92));
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow: 0 30px 90px rgba(0,0,0,.60);
+      padding:16px;
+      text-align:center;
+    }
+    .card h1{margin:6px 0 8px;font-size:18px;letter-spacing:.2px}
+    .card p{margin:0 0 12px;color:rgba(255,255,255,.75);font-size:13px;line-height:1.35}
+    .bigBtn{
+      display:inline-flex; align-items:center; justify-content:center; gap:10px;
+      padding:12px 14px; border-radius:18px;
+      background: linear-gradient(180deg, rgba(140,124,255,.28), rgba(76,230,255,.14));
+      border:1px solid rgba(255,255,255,.16);
+      font-weight:1000; user-select:none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .bigBtn:active{filter:brightness(.95); transform:translateY(1px)}
+
+    /* Bottom sheets */
+    .modal{
+      position:absolute; inset:0; z-index:20;
+      display:none; align-items:flex-end; justify-content:center;
+      padding:10px;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(10px);
+    }
+    .modal.on{display:flex}
+    .sheet{
+      width:min(920px,100%);
+      max-height: calc(100% - max(18px, env(safe-area-inset-top)));
+      overflow:hidden;
+      border-radius:22px;
+      background: linear-gradient(180deg, rgba(18,26,43,.94), rgba(10,14,25,.94));
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow: 0 30px 90px rgba(0,0,0,.60);
+      display:flex; flex-direction:column;
+    }
+    .sheetTop{
+      padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      background: linear-gradient(180deg, rgba(18,26,43,.98), rgba(18,26,43,.70));
+    }
+    .sheetTop h2{margin:0;font-size:16px}
+    .coinsPill{
+      padding:8px 10px; border-radius:999px;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      font-weight:1000; display:flex; gap:8px; align-items:center;
+    }
+    .sheetBody{padding:12px 14px 14px; overflow:auto; -webkit-overflow-scrolling:touch}
+    .tabs{display:flex; gap:10px; margin-bottom:12px}
+    .tab{
+      flex:1; padding:10px 12px; border-radius:14px;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      color: rgba(255,255,255,.85);
+      font-weight:1000; text-align:center;
+      user-select:none; -webkit-tap-highlight-color:transparent;
+    }
+    .tab.on{
+      background: linear-gradient(180deg, rgba(140,124,255,.22), rgba(76,230,255,.10));
+      border-color: rgba(255,255,255,.16);
+      color: rgba(255,255,255,.95);
+      box-shadow: 0 16px 50px rgba(0,0,0,.35);
+    }
+    .grid{
+      display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px;
+    }
+    @media (max-width:720px){ .grid{grid-template-columns:1fr;} }
+    .item{
+      padding:12px; border-radius:18px;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      display:flex; flex-direction:column; gap:8px;
+    }
+    .head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+    .tag{font-size:12px; color:rgba(255,255,255,.75); padding:4px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.05)}
+    .price{font-weight:1000; color:var(--gold); text-shadow:0 0 16px rgba(255,215,106,.25)}
+    .muted{color:var(--muted); font-size:12.5px; line-height:1.35}
+    .rowBtns{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:2px;}
+    .mini{
+      padding:9px 10px; border-radius:12px;
+      background: linear-gradient(180deg, rgba(140,124,255,.25), rgba(76,230,255,.14));
+      border:1px solid rgba(255,255,255,.14);
+      color:var(--text); font-weight:1000;
+      user-select:none;
+      -webkit-tap-highlight-color: transparent;
+      cursor:pointer;
+    }
+    .mini:active{transform: translateY(1px) scale(.99); filter:brightness(.95)}
+    .mini:disabled{opacity:.45; cursor:not-allowed}
+    .equip{ background: linear-gradient(180deg, rgba(124,255,178,.18), rgba(255,215,106,.12)); }
+
+    /* Gacha wheel */
+    .wheelWrap{display:flex; flex-direction:column; gap:10px; align-items:center; padding:10px 0 0}
+    .wheelCanvas{
+      width:min(360px, 92vw); aspect-ratio:1/1;
+      border-radius:50%;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow: 0 24px 70px rgba(0,0,0,.45);
+    }
+    .wheelHint{color:rgba(255,255,255,.72); font-size:12.5px; text-align:center; line-height:1.35}
+
+    .badge{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 10px; border-radius:999px;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      font-weight:1000; font-size:12.5px;
+    }
+
+    .rar{
+      padding:4px 8px; border-radius:999px; font-weight:1000; font-size:12px;
+      border:1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+      color: rgba(255,255,255,.9);
+      white-space:nowrap;
+    }
+    .rar.common{box-shadow:0 0 0 rgba(0,0,0,0)}
+    .rar.uncommon{border-color: rgba(76,230,255,.35); }
+    .rar.rare{border-color: rgba(140,124,255,.40); }
+    .rar.legendary{border-color: rgba(255,215,106,.45); }
+    .rar.mythic{border-color: rgba(176,118,255,.55); }
+
+    .record{
+      position:absolute; left:50%;
+      top: calc(56px + max(8px, env(safe-area-inset-top)));
+      transform:translateX(-50%) scale(.9);
+      padding:12px 16px; border-radius:999px;
+      background: linear-gradient(180deg, rgba(140,124,255,.28), rgba(76,230,255,.14));
+      border:1px solid rgba(255,255,255,.16);
+      box-shadow: 0 22px 70px rgba(0,0,0,.45);
+      backdrop-filter: blur(10px);
+      font-weight:1000; letter-spacing:.6px;
+      opacity:0; z-index:12; pointer-events:none;
+    }
+    .record.on{animation: pop 1.25s ease forwards;}
+    @keyframes pop{
+      0%{opacity:0; transform:translateX(-50%) translateY(-10px) scale(.88)}
+      20%{opacity:1; transform:translateX(-50%) translateY(0px) scale(1.02)}
+      55%{opacity:1; transform:translateX(-50%) translateY(0px) scale(1)}
+      100%{opacity:0; transform:translateX(-50%) translateY(-10px) scale(.96)}
+    }
+  </style>
+</head>
+<body>
+<div class="frame">
+  <canvas id="c"></canvas>
+
+  <div class="hud">
+    <div class="pill">
+      <span>🏁 <small>Лвл</small> <span id="uiLvl">1</span></span>
+      <span>🪙 <small>Монеты</small> <span id="uiCoins">0</span></span>
+      <span>💎 <small>Гемы</small> <span id="uiGems">0</span></span>
+      <span>🏆 <small>Рекорд</small> <span id="uiBest">0</span></span>
+    </div>
+    <div class="btns">
+      <div class="btn" id="btnShop"><span class="dot"></span>Shop</div>
+      <div class="btn" id="btnPets"><span class="dot" style="background:var(--vio)"></span>Pets</div>
+      <div class="btn" id="btnPause"><span class="dot" style="background:var(--gold)"></span>⏸</div>
+    </div>
+  </div>
+
+  <div class="record" id="recordBanner">🔥 НОВЫЙ РЕКОРД!</div>
+  <div class="toast" id="toast"></div>
+
+  <div class="start" id="start">
+    <div class="card">
+      <div style="font-weight:1000;letter-spacing:.6px;color:rgba(255,255,255,.85)">BALL BLAST: NEON PETS</div>
+      <h1>Зажал → веди пальцем</h1>
+      <p>Пушка стреляет сама. Уклоняйся от шаров, ломай их на мелкие, собирай монеты и гемы. В магазине апгрейды, а в Pets — рулетка питомцев.</p>
+      <div class="bigBtn" id="btnStart">▶ Старт</div>
+    </div>
+  </div>
+
+  <!-- SHOP -->
+  <div class="modal" id="modalShop">
+    <div class="sheet">
+      <div class="sheetTop">
+        <div>
+          <h2>Магазин</h2>
+          <div class="muted" style="margin-top:4px">Апгрейды для пушки. Всё сохраняется.</div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center">
+          <div class="coinsPill">🪙 <span id="uiCoins2">0</span></div>
+          <div class="btn" id="btnCloseShop"><span class="dot"></span>Закрыть</div>
+        </div>
+      </div>
+      <div class="sheetBody">
+        <div class="grid" id="shopGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PETS -->
+  <div class="modal" id="modalPets">
+    <div class="sheet">
+      <div class="sheetTop">
+        <div>
+          <h2>Питомцы</h2>
+          <div class="muted" style="margin-top:4px">Рулетка даёт питомцев разной редкости. Они бустят урон и монеты.</div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center">
+          <div class="coinsPill">💎 <span id="uiGems2">0</span></div>
+          <div class="btn" id="btnClosePets"><span class="dot"></span>Закрыть</div>
+        </div>
+      </div>
+      <div class="sheetBody">
+        <div class="tabs">
+          <div class="tab on" id="tabGacha">Рулетка</div>
+          <div class="tab" id="tabInv">Инвентарь</div>
+        </div>
+
+        <div id="petsGacha">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-bottom:10px">
+            <span class="badge">🎯 <b>Бонус урона:</b> <span id="uiPetDmg">0%</span></span>
+            <span class="badge">🪙 <b>Бонус монет:</b> <span id="uiPetCoin">0%</span></span>
+          </div>
+
+          <div class="wheelWrap">
+            <canvas id="wheel" class="wheelCanvas" width="640" height="640"></canvas>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center">
+              <div class="mini" id="spin1">Крутить x1 (💎 25)</div>
+              <div class="mini" id="spin10">Крутить x10 (💎 220)</div>
+            </div>
+            <div class="wheelHint">
+              Шанс: Обычный 60% • Необычный 22% • Редкий 12% • Легендарный 5% • Мифический 1%
+            </div>
+          </div>
+
+          <div style="height:12px"></div>
+          <div class="muted" style="text-align:center">
+            Гемы падают с босс-шаров и за уровни. Мифик — ультра редкость 😈
+          </div>
+        </div>
+
+        <div id="petsInv" style="display:none">
+          <div class="muted" style="margin-bottom:10px; text-align:center">
+            Выбирай активного питомца — он даёт бафы. Дубликаты → усиливают уровень питомца.
+          </div>
+          <div class="grid" id="invGrid"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  const $ = (id)=>document.getElementById(id);
+
+  // UI
+  const canvas = $('c');
+  const ctx = canvas.getContext('2d', {alpha:true});
+
+  const uiLvl = $('uiLvl');
+  const uiCoins = $('uiCoins');
+  const uiGems  = $('uiGems');
+  const uiBest  = $('uiBest');
+  const uiCoins2= $('uiCoins2');
+  const uiGems2 = $('uiGems2');
+
+  const toastEl = $('toast');
+  const recordBanner = $('recordBanner');
+
+  const startOverlay = $('start');
+  const btnStart = $('btnStart');
+
+  const btnShop = $('btnShop');
+  const btnPets = $('btnPets');
+  const btnPause= $('btnPause');
+
+  const modalShop = $('modalShop');
+  const btnCloseShop = $('btnCloseShop');
+  const shopGrid = $('shopGrid');
+
+  const modalPets = $('modalPets');
+  const btnClosePets = $('btnClosePets');
+
+  const tabGacha = $('tabGacha');
+  const tabInv   = $('tabInv');
+  const petsGacha= $('petsGacha');
+  const petsInv  = $('petsInv');
+  const invGrid  = $('invGrid');
+
+  const uiPetDmg = $('uiPetDmg');
+  const uiPetCoin= $('uiPetCoin');
+
+  const wheel = $('wheel');
+  const wctx = wheel.getContext('2d');
+
+  const spin1 = $('spin1');
+  const spin10= $('spin10');
+
+  // Utils
+  const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const rand=(a,b)=>a+Math.random()*(b-a);
+  const irand=(a,b)=>Math.floor(rand(a,b+1));
+  const now=()=>performance.now();
+
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('on');
+    clearTimeout(toastEl._t);
+    toastEl._t = setTimeout(()=>toastEl.classList.remove('on'), 1400);
+  }
+  function showRecord(){
+    recordBanner.classList.remove('on');
+    void recordBanner.offsetWidth;
+    recordBanner.classList.add('on');
+  }
+
+  // World sizing
+  const world = { w: 360, h: 640 };
+  function resize(){
+    const r = canvas.getBoundingClientRect();
+    canvas.width  = Math.floor(r.width  * DPR);
+    canvas.height = Math.floor(r.height * DPR);
+    world.w = r.width; world.h = r.height;
+  }
+  addEventListener('resize', resize, {passive:true});
+  resize();
+
+  // Save
+  const SAVE_KEY = 'ballblast_neonpets_v1';
+  const defaultSave = ()=>({
+    coins: 0,
+    gems:  0,
+    bestLvl: 0,
+    upgrades: {
+      dmg:0, fire:0, speed:0, cannons:0, crit:0, magnet:0, armor:0
+    },
+    pets: {
+      activeId: 'none',
+      // owned map: id -> {lvl,count}
+      owned: {
+        none: {lvl:1,count:1}
+      }
+    }
+  });
+
+  function loadSave(){
+    try{
+      const raw = localStorage.getItem(SAVE_KEY);
+      if(!raw) return defaultSave();
+      const s = JSON.parse(raw);
+      const b = defaultSave();
+      s.coins = Number(s.coins ?? b.coins) || 0;
+      s.gems  = Number(s.gems  ?? b.gems ) || 0;
+      s.bestLvl = Number(s.bestLvl ?? b.bestLvl) || 0;
+      s.upgrades = {...b.upgrades, ...(s.upgrades||{})};
+      s.pets = {...b.pets, ...(s.pets||{})};
+      s.pets.owned = (s.pets.owned && typeof s.pets.owned==='object') ? s.pets.owned : b.pets.owned;
+      if(!s.pets.owned.none) s.pets.owned.none = {lvl:1,count:1};
+      if(!s.pets.activeId) s.pets.activeId='none';
+      return s;
+    }catch{ return defaultSave(); }
+  }
+  let SAVE = loadSave();
+  const saveNow = ()=>localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE));
+
+  // Particles (hits, fireworks, coins pop)
+  const particles = [];
+  function spawnBurst(x,y, count=26, power=5, hue=200){
+    for(let i=0;i<count;i++){
+      const a = rand(0, Math.PI*2);
+      const s = rand(1.2, power);
+      particles.push({
+        x,y,
+        vx: Math.cos(a)*s,
+        vy: Math.sin(a)*s - rand(0, 1.2),
+        life: rand(22, 46),
+        size: rand(2, 3.8),
+        kind:'spark',
+        hue: hue + rand(-40,40)
+      });
+    }
+  }
+  function spawnConfetti(){
+    for(let i=0;i<90;i++){
+      particles.push({
+        x: rand(0,world.w),
+        y: rand(-30, 30),
+        vx: rand(-1.5,1.5),
+        vy: rand(1.0,3.2),
+        life: rand(80,130),
+        size: rand(2.2,4.2),
+        kind:'confetti',
+        hue: rand(0,360),
+        rot: rand(0,Math.PI*2),
+        vr: rand(-0.2,0.2)
+      });
+    }
+  }
+  function fireworks(){
+    spawnBurst(rand(world.w*0.25, world.w*0.75), rand(world.h*0.25, world.h*0.55), 65, 6.8, 55);
+    spawnBurst(rand(world.w*0.25, world.w*0.75), rand(world.h*0.25, world.h*0.55), 55, 6.2, 200);
+  }
+  function stepParticles(dt){
+    for(let i=particles.length-1;i>=0;i--){
+      const p=particles[i];
+      p.life -= dt;
+      if(p.life<=0){particles.splice(i,1);continue;}
+      if(p.kind==='spark'){
+        p.vy += 0.12*dt;
+        p.x += p.vx*dt;
+        p.y += p.vy*dt;
+        p.vx *= 0.98; p.vy *= 0.98;
+      } else {
+        p.vy += 0.03*dt;
+        p.x += p.vx*dt;
+        p.y += p.vy*dt;
+        p.rot += (p.vr||0)*dt;
+      }
+    }
+  }
+  function drawParticles(){
+    for(const p of particles){
+      if(p.kind==='spark'){
+        ctx.save();
+        const a=clamp(p.life/46,0,1);
+        ctx.globalAlpha = 0.9*a;
+        ctx.fillStyle = `hsla(${p.hue}, 95%, 65%, 1)`;
+        ctx.shadowColor = `hsla(${p.hue}, 95%, 65%, .65)`;
+        ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+        ctx.restore();
+      } else {
+        ctx.save();
+        const a=clamp(p.life/130,0,1);
+        ctx.globalAlpha = 0.95*a;
+        ctx.translate(p.x,p.y);
+        ctx.rotate(p.rot||0);
+        ctx.fillStyle = `hsla(${p.hue}, 95%, 65%, 1)`;
+        ctx.fillRect(-p.size, -p.size*0.6, p.size*2, p.size*1.2);
+        ctx.restore();
+      }
+    }
+  }
+
+  // Pets (gacha + buffs)
+  const RARITIES = [
+    {id:'common',    name:'Обычный',      chance:0.60, color:'rgba(255,255,255,.85)'},
+    {id:'uncommon',  name:'Необычный',    chance:0.22, color:'rgba(76,230,255,.95)'},
+    {id:'rare',      name:'Редкий',       chance:0.12, color:'rgba(140,124,255,.95)'},
+    {id:'legendary', name:'Легендарный',  chance:0.05, color:'rgba(255,215,106,.95)'},
+    {id:'mythic',    name:'Мифический',   chance:0.01, color:'rgba(176,118,255,.98)'},
+  ];
+
+  // Pet pool (много разных)
+  const PETS = [
+    // common
+    {id:'slime',      name:'Слайм',      rar:'common',    dmg:2,  coin:4},
+    {id:'chipmunk',   name:'Бурундук',   rar:'common',    dmg:3,  coin:3},
+    {id:'drone',      name:'Дрон',       rar:'common',    dmg:4,  coin:2},
+    {id:'frog',       name:'Лягушка',    rar:'common',    dmg:2,  coin:5},
+    {id:'cat',        name:'Кот',        rar:'common',    dmg:3,  coin:4},
+
+    // uncommon
+    {id:'fox',        name:'Лис',        rar:'uncommon',  dmg:6,  coin:7},
+    {id:'bat',        name:'Бэт',        rar:'uncommon',  dmg:7,  coin:6},
+    {id:'owl',        name:'Сова',       rar:'uncommon',  dmg:5,  coin:9},
+    {id:'sparkle',    name:'Искра',      rar:'uncommon',  dmg:8,  coin:5},
+
+    // rare
+    {id:'panther',    name:'Пантера',    rar:'rare',      dmg:12, coin:10},
+    {id:'mecha',      name:'Меха',       rar:'rare',      dmg:14, coin:8},
+    {id:'djinn',      name:'Джинн',      rar:'rare',      dmg:10, coin:14},
+
+    // legendary
+    {id:'phoenix',    name:'Феникс',     rar:'legendary', dmg:22, coin:16},
+    {id:'dragon',     name:'Дракон',     rar:'legendary', dmg:26, coin:14},
+    {id:'orb',        name:'Орб',        rar:'legendary', dmg:18, coin:22},
+
+    // mythic
+    {id:'voidlord',   name:'ВойдЛорд',   rar:'mythic',    dmg:40, coin:28},
+    {id:'celestial',  name:'Небожитель', rar:'mythic',    dmg:34, coin:36},
+  ];
+
+  function rarityMeta(id){ return RARITIES.find(r=>r.id===id); }
+  function petById(id){ return PETS.find(p=>p.id===id) || null; }
+
+  function rollRarity(){
+    const r=Math.random();
+    let acc=0;
+    for(const t of RARITIES){
+      acc+=t.chance;
+      if(r<=acc) return t.id;
+    }
+    return 'common';
+  }
+
+  function rollPet(){
+    const rar = rollRarity();
+    const pool = PETS.filter(p=>p.rar===rar);
+    return pool[irand(0,pool.length-1)];
+  }
+
+  function addPet(pet){
+    if(!SAVE.pets.owned[pet.id]){
+      SAVE.pets.owned[pet.id] = {lvl:1, count:1};
+    } else {
+      SAVE.pets.owned[pet.id].count += 1;
+      // дубликат = шанс апнуть (простая система: каждые 3 копии -> +1 lvl)
+      const data = SAVE.pets.owned[pet.id];
+      const need = 3 + Math.floor((data.lvl-1)*1.5);
+      if (data.count >= need){
+        data.count -= need;
+        data.lvl += 1;
+        toast(`Питомец ${pet.name} улучшен до LVL ${data.lvl}!`);
+      }
+    }
+    // авто-активируем первый нормальный питомец
+    if(SAVE.pets.activeId === 'none') SAVE.pets.activeId = pet.id;
+    saveNow();
+  }
+
+  function petBuff(){
+    const id = SAVE.pets.activeId || 'none';
+    if(id==='none') return {dmgPct:0, coinPct:0, name:'None', rar:'common', lvl:1};
+    const pet = petById(id);
+    if(!pet) return {dmgPct:0, coinPct:0, name:'None', rar:'common', lvl:1};
+    const lvl = SAVE.pets.owned[id]?.lvl || 1;
+    // рост бафа по уровню
+    const mult = 1 + (lvl-1)*0.18;
+    return {
+      dmgPct: Math.round(pet.dmg * mult),
+      coinPct: Math.round(pet.coin * mult),
+      name: pet.name,
+      rar: pet.rar,
+      lvl
+    };
+  }
+
+  // Upgrades
+  const U = SAVE.upgrades;
+  const UPGRADE_ITEMS = [
+    {id:'dmg',     name:'Урон',          tag:'DMG', desc:'+урон по шарам', base:70,  scale:1.55, max:60},
+    {id:'fire',    name:'Скорострельн.', tag:'DPS', desc:'стреляешь чаще', base:90,  scale:1.60, max:50},
+    {id:'speed',   name:'Скорость пули', tag:'SPD', desc:'пули быстрее',   base:80,  scale:1.50, max:50},
+    {id:'cannons', name:'+ Пушка',       tag:'MULTI',desc:'добавляет ствол',base:220, scale:1.85, max:6},
+    {id:'crit',    name:'Крит',          tag:'CRIT',desc:'шанс крит-урона', base:140, scale:1.70, max:40},
+    {id:'magnet',  name:'Магнит монет',  tag:'FARM',desc:'монеты тянутся', base:120, scale:1.65, max:40},
+    {id:'armor',   name:'Броня',         tag:'SAFE',desc:'разовый щит/ур.', base:260, scale:2.00, max:10},
+  ];
+  const up=(id)=>SAVE.upgrades[id]||0;
+  const upCost=(it)=>Math.floor(it.base * Math.pow(it.scale, up(it.id)));
+
+  // Gameplay state
+  const player = {
+    x: 0, y: 0, r: 22,
+    targetX: null,
+    vx: 0
+  };
+
+  let running=false;
+  let paused=false;
+
+  let lvl=1;
+  let bestLvl = SAVE.bestLvl || 0;
+
+  // stats computed
+  const stats = {
+    dmg: 1,
+    fireCd: 180,
+    bulletSpeed: 10,
+    cannons: 1,
+    critChance: 0.03,
+    critMult: 1.8,
+    magnet: 0,
+    armor: 0,
+    coinMult: 1.0
+  };
+
+  // Entities
+  const bullets = [];   // {x,y,vx,vy, dmg, life}
+  const balls = [];     // {x,y,vx,vy,r,hp,maxHp, value, tier, boss}
+  const coins = [];     // {x,y,vx,vy, v, taken}
+  const gems  = [];     // {x,y,vx,vy, taken}
+  let shieldHits = 0;
+
+  let lastShot = 0;
+  let lastT = now();
+
+  function syncUI(){
+    uiLvl.textContent = lvl;
+    uiCoins.textContent = SAVE.coins;
+    uiGems.textContent  = SAVE.gems;
+    uiBest.textContent  = SAVE.bestLvl || 0;
+    uiCoins2.textContent= SAVE.coins;
+    uiGems2.textContent = SAVE.gems;
+
+    const pb = petBuff();
+    uiPetDmg.textContent  = pb.dmgPct + '%';
+    uiPetCoin.textContent = pb.coinPct + '%';
+  }
+
+  function applyStats(){
+    const pet = petBuff();
+    const dmgBase = 1 + up('dmg') * 0.9;
+    const fire = 180 / (1 + up('fire') * 0.06); // ms
+    const spd = 10 + up('speed') * 0.35;
+    const cann = 1 + up('cannons');
+    const crit = 0.03 + up('crit') * 0.007; // up to ~0.31
+    const magnet = up('magnet') * 18;       // radius px
+    const armor = up('armor');
+
+    stats.dmg = dmgBase * (1 + pet.dmgPct/100);
+    stats.fireCd = clamp(fire, 55, 220);
+    stats.bulletSpeed = clamp(spd, 8, 26);
+    stats.cannons = clamp(cann, 1, 7);
+    stats.critChance = clamp(crit, 0.03, 0.35);
+    stats.critMult = 1.8;
+    stats.magnet = magnet;
+    stats.armor = armor;
+    stats.coinMult = 1 + pet.coinPct/100;
+  }
+
+  // Drag control
+  function clientXToWorldX(clientX){
+    const r = canvas.getBoundingClientRect();
+    return (clientX - r.left) * (world.w / r.width);
+  }
+  let dragging=false, pid=null;
+  canvas.addEventListener('pointerdown', (e)=>{
+    if(!running || paused) return;
+    if(modalShop.classList.contains('on') || modalPets.classList.contains('on')) return;
+    dragging=true; pid=e.pointerId;
+    try{ canvas.setPointerCapture(pid); }catch{}
+    player.targetX = clientXToWorldX(e.clientX);
+  }, {passive:false});
+  canvas.addEventListener('pointermove', (e)=>{
+    if(!dragging || e.pointerId!==pid) return;
+    player.targetX = clientXToWorldX(e.clientX);
+  }, {passive:false});
+  function endDrag(e){
+    if(e.pointerId!==pid) return;
+    dragging=false; pid=null;
+    player.targetX = null;
+  }
+  canvas.addEventListener('pointerup', endDrag, {passive:false});
+  canvas.addEventListener('pointercancel', endDrag, {passive:false});
+
+  // Start / Pause
+  btnStart.addEventListener('click', ()=>{
+    startOverlay.style.display='none';
+    resetRun(true);
+    running=true;
+    paused=false;
+    toast('Веди пальцем 👆');
+  });
+
+  btnPause.addEventListener('click', ()=>{
+    if(!running) return;
+    paused = !paused;
+    toast(paused ? 'Пауза' : 'Продолжить');
+  });
+
+  // Shop modal
+  function openShop(){ modalShop.classList.add('on'); renderShop(); }
+  function closeShop(){ modalShop.classList.remove('on'); }
+  btnShop.addEventListener('click', ()=>{ if(!running) return; paused=true; openShop(); });
+  btnCloseShop.addEventListener('click', ()=>{ closeShop(); paused=false; });
+  modalShop.addEventListener('click', (e)=>{ if(e.target===modalShop){ closeShop(); paused=false; } });
+
+  // Pets modal
+  function openPets(){ modalPets.classList.add('on'); renderPets(); drawWheel(); }
+  function closePets(){ modalPets.classList.remove('on'); }
+  btnPets.addEventListener('click', ()=>{ if(!running) return; paused=true; openPets(); });
+  btnClosePets.addEventListener('click', ()=>{ closePets(); paused=false; });
+  modalPets.addEventListener('click', (e)=>{ if(e.target===modalPets){ closePets(); paused=false; } });
+
+  tabGacha.addEventListener('click', ()=>{
+    tabGacha.classList.add('on'); tabInv.classList.remove('on');
+    petsGacha.style.display='block'; petsInv.style.display='none';
+    drawWheel(); syncUI();
+  });
+  tabInv.addEventListener('click', ()=>{
+    tabInv.classList.add('on'); tabGacha.classList.remove('on');
+    petsInv.style.display='block'; petsGacha.style.display='none';
+    renderInv(); syncUI();
+  });
+
+  // Shop rendering
+  function renderShop(){
+    applyStats();
+    syncUI();
+    shopGrid.innerHTML = '';
+    for(const it of UPGRADE_ITEMS){
+      const lvlv = up(it.id);
+      const maxed = lvlv >= it.max;
+      const price = upCost(it);
+
+      const el = document.createElement('div');
+      el.className='item';
+      el.innerHTML = `
+        <div class="head">
+          <div>
+            <div style="font-weight:1000">${it.name} <span style="color:rgba(255,255,255,.55)">LVL ${lvlv}/${it.max}</span></div>
+            <div style="height:6px"></div>
+            <span class="tag">${it.tag}</span>
+          </div>
+          <div class="price">🪙 ${maxed ? 'MAX' : price}</div>
+        </div>
+        <div class="muted">${it.desc}</div>
+        <div class="rowBtns">
+          <div class="muted">${maxed ? 'Уже куплено.' : (SAVE.coins>=price ? 'Доступно ✅' : 'Не хватает 🥲')}</div>
+          <button class="mini" ${maxed||SAVE.coins<price?'disabled':''}>Купить</button>
+        </div>
+      `;
+      el.querySelector('button').addEventListener('click', ()=>{
+        if(maxed) return;
+        const cost = upCost(it);
+        if(SAVE.coins < cost) return;
+        SAVE.coins -= cost;
+        SAVE.upgrades[it.id] = lvlv + 1;
+        saveNow();
+        applyStats();
+        fireworks();
+        toast(`Куплено: ${it.name}`);
+        renderShop();
+      });
+      shopGrid.appendChild(el);
+    }
+  }
+
+  // Wheel drawing
+  let wheelAngle = 0; // radians
+  function drawWheel(){
+    const W=wheel.width, H=wheel.height;
+    const cx=W/2, cy=H/2;
+    wctx.clearRect(0,0,W,H);
+
+    // segments per rarity
+    const segs = [
+      {rar:'common',    w:0.60, label:'Обычный'},
+      {rar:'uncommon',  w:0.22, label:'Необыч.'},
+      {rar:'rare',      w:0.12, label:'Редкий'},
+      {rar:'legendary', w:0.05, label:'Легенд.'},
+      {rar:'mythic',    w:0.01, label:'Мифик'},
+    ];
+
+    // background ring
+    wctx.save();
+    wctx.translate(cx,cy);
+    wctx.rotate(wheelAngle);
+
+    let a0 = -Math.PI/2;
+    for(const s of segs){
+      const a1 = a0 + s.w * Math.PI*2;
+      const meta = rarityMeta(s.rar);
+      // slice
+      wctx.beginPath();
+      wctx.moveTo(0,0);
+      wctx.arc(0,0, cx-18, a0, a1);
+      wctx.closePath();
+      wctx.fillStyle = meta.color.replace(')', ', .20)').replace('rgba', 'rgba');
+      wctx.fill();
+
+      wctx.strokeStyle = 'rgba(255,255,255,.10)';
+      wctx.lineWidth = 6;
+      wctx.stroke();
+
+      // text
+      const mid=(a0+a1)/2;
+      wctx.save();
+      wctx.rotate(mid);
+      wctx.textAlign='right';
+      wctx.fillStyle='rgba(255,255,255,.92)';
+      wctx.font='900 34px system-ui';
+      wctx.fillText(s.label, cx-48, 12);
+      wctx.restore();
+
+      a0 = a1;
+    }
+
+    // inner circle
+    wctx.beginPath();
+    wctx.arc(0,0, cx-120, 0, Math.PI*2);
+    wctx.fillStyle = 'rgba(0,0,0,.22)';
+    wctx.fill();
+    wctx.strokeStyle = 'rgba(255,255,255,.12)';
+    wctx.lineWidth = 4;
+    wctx.stroke();
+
+    // title
+    wctx.fillStyle = 'rgba(255,255,255,.92)';
+    wctx.font = '1000 34px system-ui';
+    wctx.textAlign='center';
+    wctx.fillText('SPIN', 0, 12);
+
+    wctx.restore();
+
+    // pointer
+    wctx.save();
+    wctx.translate(cx, cy);
+    wctx.beginPath();
+    wctx.moveTo(0, -cy+26);
+    wctx.lineTo(-20, -cy+72);
+    wctx.lineTo(20, -cy+72);
+    wctx.closePath();
+    wctx.fillStyle = 'rgba(255,215,106,.95)';
+    wctx.shadowColor = 'rgba(255,215,106,.55)';
+    wctx.shadowBlur = 18;
+    wctx.fill();
+    wctx.restore();
+  }
+
+  // Gacha spin logic
+  let spinning = false;
+
+  function pickByChances(){
+    return rollPet();
+  }
+
+  function spinOnce(cost){
+    if(spinning) return;
+    if(SAVE.gems < cost){ toast('Не хватает гемов 💎'); return; }
+    SAVE.gems -= cost;
+    saveNow();
+    syncUI();
+
+    spinning = true;
+
+    const prize = pickByChances();
+    const rarMeta = rarityMeta(prize.rar);
+
+    // Spin animation: big random rotations
+    const startA = wheelAngle;
+    const spins = rand(5.5, 7.5) * Math.PI*2;
+    const endA = startA + spins + rand(-0.6,0.6);
+
+    const t0 = now();
+    const dur = 1300;
+
+    function easeOutCubic(t){ return 1 - Math.pow(1-t,3); }
+
+    (function anim(){
+      const t = clamp((now()-t0)/dur, 0, 1);
+      wheelAngle = startA + (endA - startA) * easeOutCubic(t);
+      drawWheel();
+
+      if(t < 1){
+        requestAnimationFrame(anim);
+      } else {
+        // grant prize
+        addPet(prize);
+        fireworks();
+        spawnConfetti();
+        toast(`Выпал: ${prize.name} (${rarMeta.name})`);
+        spinning = false;
+        renderInv();
+        syncUI();
+      }
+    })();
+  }
+
+  function spinTen(){
+    if(spinning) return;
+    const cost = 220;
+    if(SAVE.gems < cost){ toast('Не хватает гемов 💎'); return; }
+    SAVE.gems -= cost;
+    saveNow();
+    syncUI();
+
+    spinning = true;
+
+    // fast multi spins with one animation + results
+    const results=[];
+    for(let i=0;i<10;i++) results.push(pickByChances());
+
+    const startA = wheelAngle;
+    const spins = rand(9.0, 11.0) * Math.PI*2;
+    const endA = startA + spins;
+
+    const t0=now(), dur=1550;
+    function easeOutExpo(t){ return t===1 ? 1 : 1 - Math.pow(2, -10*t); }
+
+    (function anim(){
+      const t = clamp((now()-t0)/dur, 0, 1);
+      wheelAngle = startA + (endA-startA)*easeOutExpo(t);
+      drawWheel();
+      if(t<1) requestAnimationFrame(anim);
+      else{
+        // grant all
+        for(const p of results) addPet(p);
+        fireworks();
+        spawnConfetti();
+        // summary
+        const counts = {};
+        for(const p of results){ counts[p.rar]=(counts[p.rar]||0)+1; }
+        const txt = Object.entries(counts).map(([k,v])=>`${k}:${v}`).join(' • ');
+        toast(`x10 готово! (${txt})`);
+        spinning=false;
+        renderInv();
+        syncUI();
+      }
+    })();
+  }
+
+  spin1.addEventListener('click', ()=>spinOnce(25));
+  spin10.addEventListener('click', ()=>spinTen());
+
+  // Inventory rendering
+  function rarClass(r){
+    return r==='common'?'common':
+           r==='uncommon'?'uncommon':
+           r==='rare'?'rare':
+           r==='legendary'?'legendary':'mythic';
+  }
+  function renderInv(){
+    invGrid.innerHTML='';
+    const owned = SAVE.pets.owned;
+    const entries = Object.keys(owned)
+      .filter(id=>id!=='none')
+      .map(id=>{
+        const pet = petById(id);
+        return {id, pet, lvl:owned[id].lvl, count:owned[id].count};
+      })
+      .filter(x=>x.pet)
+      .sort((a,b)=>{
+        const order = {mythic:5, legendary:4, rare:3, uncommon:2, common:1};
+        return order[b.pet.rar]-order[a.pet.rar] || b.lvl-a.lvl;
+      });
+
+    if(entries.length===0){
+      const el=document.createElement('div');
+      el.className='item';
+      el.style.gridColumn='1/-1';
+      el.innerHTML=`<div style="font-weight:1000">Питомцев нет 😢</div>
+                    <div class="muted">Открой рулетку — крути за гемы 💎</div>`;
+      invGrid.appendChild(el);
+      return;
+    }
+
+    for(const e of entries){
+      const meta = rarityMeta(e.pet.rar);
+      const active = (SAVE.pets.activeId === e.id);
+
+      const el=document.createElement('div');
+      el.className='item';
+      el.innerHTML = `
+        <div class="head">
+          <div>
+            <div style="font-weight:1000; display:flex; gap:10px; align-items:center">
+              ${e.pet.name}
+              <span class="rar ${rarClass(e.pet.rar)}">${meta.name}</span>
+              <span style="color:rgba(255,255,255,.55)">LVL ${e.lvl}</span>
+            </div>
+            <div style="height:6px"></div>
+            <span class="tag">+${Math.round(e.pet.dmg*(1+(e.lvl-1)*0.18))}% DMG</span>
+            <span class="tag">+${Math.round(e.pet.coin*(1+(e.lvl-1)*0.18))}% COIN</span>
+          </div>
+          <div style="text-align:right">
+            <div class="price">x${e.count}</div>
+            <div class="muted" style="font-size:12px">дубликаты</div>
+          </div>
+        </div>
+        <div class="muted">Бафы суммарно действуют всегда, пока питомец активен.</div>
+        <div class="rowBtns">
+          <div class="muted">${active ? 'Сейчас активен ✅' : 'Можно активировать.'}</div>
+          <button class="mini equip" ${active?'disabled':''}>Активировать</button>
+        </div>
+      `;
+      el.querySelector('button').addEventListener('click', ()=>{
+        SAVE.pets.activeId = e.id;
+        saveNow();
+        applyStats();
+        fireworks();
+        toast(`Активен: ${e.pet.name}`);
+        renderInv();
+        syncUI();
+      });
+      invGrid.appendChild(el);
+    }
+  }
+
+  function renderPets(){
+    applyStats();
+    syncUI();
+    drawWheel();
+    renderInv();
+  }
+
+  // Ball Blast core
+  function resetRun(giveStartGems=false){
+    resize();
+    applyStats();
+
+    lvl = 1;
+    shieldHits = 0;
+    bullets.length = 0;
+    balls.length = 0;
+    coins.length = 0;
+    gems.length  = 0;
+    particles.length = 0;
+
+    player.x = world.w/2;
+    player.y = world.h - (60 + Math.max(10, 0)); // visual
+    player.vx = 0;
+    player.targetX = null;
+
+    lastShot = 0;
+    lastT = now();
+
+    spawnLevel(lvl);
+    if(giveStartGems && SAVE.gems < 25){
+      // лёгкий старт, чтоб можно было крутить
+      SAVE.gems += 10;
+      saveNow();
+    }
+    syncUI();
+  }
+
+  function spawnLevel(L){
+    // растущая сложность
+    const count = clamp(2 + Math.floor(L/3), 2, 6);
+    const baseHp = 16 + L*6;
+    const bossChance = clamp(0.06 + L*0.002, 0.06, 0.16);
+
+    for(let i=0;i<count;i++){
+      const r = rand(22, 44) * (Math.random()<0.25?1.2:1.0);
+      const hp = Math.floor(baseHp * rand(0.75, 1.35));
+      const boss = Math.random() < bossChance && i===0; // максимум 1 босс чаще в начале
+      const bHp = boss ? Math.floor(hp * 2.4) : hp;
+
+      balls.push({
+        x: rand(r+16, world.w - r - 16),
+        y: rand(120, 240),
+        vx: rand(-1.8, 1.8),
+        vy: rand(-0.6, 0.6),
+        r,
+        hp: bHp,
+        maxHp: bHp,
+        value: Math.max(1, Math.floor(bHp/8)),
+        tier: boss ? 4 : (r>44?3 : r>34?2 : 1),
+        boss
+      });
+    }
+
+    // small reward
+    SAVE.coins += Math.floor(6 + L*0.6);
+    if (L % 3 === 0) SAVE.gems += 2;
+    saveNow();
+  }
+
+  function splitBall(ball){
+    // шанс гемов с босса
+    if(ball.boss){
+      const drop = 3 + Math.floor(lvl/6);
+      for(let i=0;i<drop;i++){
+        gems.push({x:ball.x, y:ball.y, vx:rand(-1.2,1.2), vy:rand(-2.2,-0.6), taken:false});
+      }
+    } else if(Math.random() < 0.10){
+      gems.push({x:ball.x, y:ball.y, vx:rand(-1.0,1.0), vy:rand(-2.0,-0.6), taken:false});
+    }
+
+    // coin burst
+    const cDrop = clamp(Math.floor(ball.value * rand(0.8, 1.5)), 2, 26);
+    for(let i=0;i<cDrop;i++){
+      coins.push({
+        x:ball.x, y:ball.y,
+        vx:rand(-2.0,2.0),
+        vy:rand(-3.5,-0.8),
+        taken:false
+      });
+    }
+
+    if(ball.r > 24){
+      // split into 2
+      const nr = ball.r * 0.72;
+      const nh = Math.max(1, Math.floor(ball.maxHp * 0.45));
+      for(const s of [-1, 1]){
+        balls.push({
+          x: ball.x + s*nr*0.3,
+          y: ball.y,
+          vx: ball.vx + s*rand(1.0, 2.0),
+          vy: rand(-1.4, -0.2),
+          r: nr,
+          hp: Math.floor(nh*0.8),
+          maxHp: nh,
+          value: Math.max(1, Math.floor(nh/10)),
+          tier: Math.max(1, ball.tier-1),
+          boss:false
+        });
+      }
+    }
+  }
+
+  function shoot(){
+    const t = now();
+    if(t - lastShot < stats.fireCd) return;
+    lastShot = t;
+
+    // cannons: spread around
+    const n = stats.cannons;
+    const spread = 0.14; // radians-ish for vx
+    for(let i=0;i<n;i++){
+      const k = (n===1) ? 0 : (i-(n-1)/2);
+      const vx = k * (stats.bulletSpeed*spread);
+      const vy = -stats.bulletSpeed;
+
+      // crit?
+      const crit = Math.random() < stats.critChance;
+      const dmg = stats.dmg * (crit ? stats.critMult : 1);
+
+      bullets.push({
+        x: player.x,
+        y: player.y - player.r - 10,
+        vx, vy,
+        dmg,
+        life: 1200,
+        crit
+      });
+    }
+  }
+
+  function step(dt){
+    // move player toward finger
+    if(player.targetX !== null){
+      const dx = player.targetX - player.x;
+      player.vx += dx * 0.05 * dt;
+    }
+    player.vx *= Math.pow(0.80, dt);
+    player.vx = clamp(player.vx, -10, 10);
+    player.x += player.vx * dt;
+    player.x = clamp(player.x, player.r+10, world.w - player.r - 10);
+
+    // shoot
+    shoot();
+
+    // bullets
+    for(let i=bullets.length-1;i>=0;i--){
+      const b=bullets[i];
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.life -= dt*16.666;
+      if(b.y < -50 || b.life<=0){
+        bullets.splice(i,1); continue;
+      }
+    }
+
+    // balls physics
+    const g = 0.18; // gravity for balls
+    for(const ball of balls){
+      ball.vy += g * dt;
+      ball.x += ball.vx * dt * 6;
+      ball.y += ball.vy * dt * 6;
+
+      // walls
+      if(ball.x - ball.r < 0){ ball.x = ball.r; ball.vx *= -1; }
+      if(ball.x + ball.r > world.w){ ball.x = world.w - ball.r; ball.vx *= -1; }
+      // floor bounce
+      const floorY = world.h - 18;
+      if(ball.y + ball.r > floorY){
+        ball.y = floorY - ball.r;
+        ball.vy *= -0.78;
+        ball.vx *= 0.98;
+      }
+    }
+
+    // collisions bullet->ball
+    for(let i=bullets.length-1;i>=0;i--){
+      const b = bullets[i];
+      let hit = false;
+      for(let j=balls.length-1;j>=0;j--){
+        const ball = balls[j];
+        const dx = b.x - ball.x;
+        const dy = b.y - ball.y;
+        const d2 = dx*dx + dy*dy;
+        if(d2 <= (ball.r*ball.r)){
+          // hit
+          const dmg = b.dmg;
+          ball.hp -= dmg;
+          spawnBurst(b.x,b.y, b.crit?18:12, b.crit?6.5:4.6, b.crit?55:200);
+          hit = true;
+          if(ball.hp <= 0){
+            balls.splice(j,1);
+            splitBall(ball);
+            spawnBurst(ball.x, ball.y, 40, 6.8, ball.boss?290:55);
+          }
+          break;
+        }
+      }
+      if(hit) bullets.splice(i,1);
+    }
+
+    // ball -> player collision (damage)
+    const armorHits = stats.armor;
+    for(let j=balls.length-1;j>=0;j--){
+      const ball=balls[j];
+      const dx = player.x - ball.x;
+      const dy = (player.y - player.r) - ball.y;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      if(d < player.r + ball.r - 4){
+        if(shieldHits < armorHits){
+          shieldHits++;
+          spawnBurst(player.x, player.y-player.r, 40, 6.8, 120);
+          toast(`Щит сработал (${shieldHits}/${armorHits})`);
+          // push ball away
+          ball.vx *= -1.1;
+          ball.vy = -Math.abs(ball.vy) - 0.8;
+        } else {
+          // game over -> restart run
+          SAVE.bestLvl = Math.max(SAVE.bestLvl||0, lvl);
+          saveNow();
+          toast('Ты проиграл 😵 (рестарт)');
+          resetRun(false);
+          return;
+        }
+      }
+    }
+
+    // coins & gems physics + magnet
+    const magR = stats.magnet;
+    const px = player.x, py = player.y - player.r;
+
+    for(const c of coins){
+      if(c.taken) continue;
+      c.vy = (c.vy ?? 0) + 0.20*dt;
+      c.x += (c.vx ?? 0) * dt * 6;
+      c.y += (c.vy ?? 0) * dt * 6;
+      (c.vx ??= 0) *= 0.985;
+      (c.vy ??= 0) *= 0.985;
+
+      // magnet
+      if(magR > 0){
+        const dx = px - c.x;
+        const dy = py - c.y;
+        const d2 = dx*dx + dy*dy;
+        if(d2 < magR*magR){
+          c.x += dx * 0.10*dt;
+          c.y += dy * 0.10*dt;
+        }
+      }
+
+      // pickup
+      const dxp = px - c.x, dyp = py - c.y;
+      if(dxp*dxp + dyp*dyp < (player.r*player.r)){
+        c.taken = true;
+        SAVE.coins += Math.max(1, Math.floor(1 * stats.coinMult));
+        spawnBurst(c.x,c.y, 10, 3.8, 55);
+      }
+    }
+
+    for(const g0 of gems){
+      if(g0.taken) continue;
+      g0.vy = (g0.vy ?? 0) + 0.18*dt;
+      g0.x += (g0.vx ?? 0) * dt * 6;
+      g0.y += (g0.vy ?? 0) * dt * 6;
+      (g0.vx ??= 0) *= 0.985;
+      (g0.vy ??= 0) *= 0.985;
+
+      // pickup
+      const dxp = px - g0.x, dyp = py - g0.y;
+      if(dxp*dxp + dyp*dyp < (player.r*player.r)){
+        g0.taken = true;
+        SAVE.gems += 1;
+        spawnBurst(g0.x,g0.y, 14, 4.2, 290);
+      }
+    }
+
+    // cleanup
+    for(let i=coins.length-1;i>=0;i--){
+      const c=coins[i];
+      if(c.taken || c.y > world.h+80) coins.splice(i,1);
+    }
+    for(let i=gems.length-1;i>=0;i--){
+      const g0=gems[i];
+      if(g0.taken || g0.y > world.h+80) gems.splice(i,1);
+    }
+
+    // level cleared
+    if(balls.length === 0){
+      lvl += 1;
+      SAVE.bestLvl = Math.max(SAVE.bestLvl||0, lvl-1);
+      saveNow();
+      applyStats();
+      if(lvl > bestLvl){
+        bestLvl = lvl;
+        showRecord();
+        spawnConfetti();
+      }
+      spawnLevel(lvl);
+      fireworks();
+      toast(`Уровень ${lvl}!`);
+    }
+
+    saveNow();
+    syncUI();
+  }
+
+  // Render
+  function roundRect(x,y,w,h,r){
+    r = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y, x+w,y+h, r);
+    ctx.arcTo(x+w,y+h, x,y+h, r);
+    ctx.arcTo(x,y+h, x,y, r);
+    ctx.arcTo(x,y, x+w,y, r);
+    ctx.closePath();
+  }
+
+  function draw(){
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+
+    // background stars
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    for (let i=0;i<80;i++){
+      const sx = (i*97.3 + lvl*12) % (world.w+120) - 60;
+      const sy = (i*53.7 + lvl*18) % world.h;
+      ctx.fillStyle = 'rgba(255,255,255,.55)';
+      ctx.fillRect(sx, sy, 2, 2);
+    }
+    ctx.restore();
+
+    // ground
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,.05)';
+    ctx.fillRect(0, world.h-18, world.w, 18);
+    ctx.restore();
+
+    // particles behind
+    drawParticles();
+
+    // bullets
+    for(const b of bullets){
+      ctx.save();
+      ctx.shadowColor = b.crit ? 'rgba(255,215,106,.65)' : 'rgba(76,230,255,.55)';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = b.crit ? 'rgba(255,215,106,.95)' : 'rgba(76,230,255,.92)';
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.crit?4.2:3.2, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // balls
+    for(const ball of balls){
+      // ball body
+      const hpPct = clamp(ball.hp/ball.maxHp, 0, 1);
+      ctx.save();
+      const glow = ball.boss ? 'rgba(176,118,255,.60)' : 'rgba(140,124,255,.50)';
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = ball.boss ? 26 : 18;
+
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
+      ctx.fillStyle = ball.boss ? 'rgba(176,118,255,.22)' : 'rgba(255,255,255,.06)';
+      ctx.fill();
+
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = ball.boss ? 'rgba(176,118,255,.55)' : 'rgba(255,255,255,.14)';
+      ctx.stroke();
+
+      // hp ring
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = ball.boss ? 'rgba(176,118,255,.85)' : 'rgba(76,230,255,.75)';
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.r+9, -Math.PI/2, -Math.PI/2 + Math.PI*2*hpPct);
+      ctx.stroke();
+
+      // number
+      ctx.fillStyle = 'rgba(255,255,255,.94)';
+      ctx.font = `${Math.max(14, Math.floor(ball.r*0.55))}px system-ui`;
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      ctx.fillText(Math.max(1, Math.floor(ball.hp)), ball.x, ball.y);
+
+      // boss crown icon
+      if(ball.boss){
+        ctx.fillStyle = 'rgba(255,215,106,.95)';
+        ctx.font = `${Math.max(18, Math.floor(ball.r*0.45))}px system-ui`;
+        ctx.fillText('👑', ball.x, ball.y - ball.r*0.78);
+      }
+
+      ctx.restore();
+    }
+
+    // coins
+    for(const c of coins){
+      if(c.taken) continue;
+      ctx.save();
+      ctx.fillStyle='rgba(255,215,106,.95)';
+      ctx.shadowColor='rgba(255,215,106,.75)';
+      ctx.shadowBlur=14;
+      ctx.beginPath(); ctx.arc(c.x,c.y,7.5,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+    // gems
+    for(const g0 of gems){
+      if(g0.taken) continue;
+      ctx.save();
+      ctx.fillStyle='rgba(176,118,255,.95)';
+      ctx.shadowColor='rgba(176,118,255,.75)';
+      ctx.shadowBlur=16;
+      ctx.beginPath();
+      ctx.moveTo(g0.x, g0.y-8);
+      ctx.lineTo(g0.x+8, g0.y);
+      ctx.lineTo(g0.x, g0.y+8);
+      ctx.lineTo(g0.x-8, g0.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // player cannon
+    ctx.save();
+    // base
+    ctx.fillStyle='rgba(255,255,255,.06)';
+    ctx.strokeStyle='rgba(255,255,255,.14)';
+    ctx.lineWidth=1.5;
+    roundRect(player.x-34, player.y-18, 68, 22, 12);
+    ctx.fill(); ctx.stroke();
+
+    // turret
+    ctx.shadowColor='rgba(76,230,255,.35)';
+    ctx.shadowBlur=18;
+    roundRect(player.x-16, player.y-52, 32, 40, 14);
+    ctx.fillStyle='rgba(140,124,255,.30)';
+    ctx.fill();
+    ctx.strokeStyle='rgba(76,230,255,.18)';
+    ctx.stroke();
+
+    // barrels count indicator
+    ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(255,255,255,.85)';
+    ctx.font='900 12px system-ui';
+    ctx.textAlign='center';
+    ctx.fillText(`x${stats.cannons}`, player.x, player.y-30);
+
+    // shield indicator
+    if(stats.armor>0){
+      ctx.fillStyle='rgba(124,255,178,.85)';
+      ctx.font='900 12px system-ui';
+      ctx.fillText(`🛡 ${Math.max(0, stats.armor-shieldHits)}`, player.x, player.y-68);
+    }
+
+    ctx.restore();
+
+    // front particles
+    drawParticles();
+  }
+
+  // Main loop
+  function tick(){
+    const t=now();
+    let dt = (t-lastT)/16.666;
+    dt = clamp(dt, 0.5, 2.2);
+    lastT=t;
+
+    if(running && !paused && !modalShop.classList.contains('on') && !modalPets.classList.contains('on')){
+      step(dt);
+    }
+    stepParticles(dt);
+    draw();
+    requestAnimationFrame(tick);
+  }
+
+  // Init
+  applyStats();
+  syncUI();
+  toast('Нажми Старт');
+  drawWheel();
+  tick();
+
+})();
+</script>
+</body>
+                                                              </html>
