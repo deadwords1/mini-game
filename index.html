@@ -1,0 +1,1936 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <title>Ball Blast (Mobile) + Pets + Stages + Chests + Admin</title>
+  <style>
+    :root{
+      --shadow: rgba(0,0,0,.25);
+      --gold: #FFC43A;
+      --gem: #8E5BFF;
+      --good: #37D17A;
+      --bad: #FF4A6B;
+      --blue: #2EC4FF;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;overflow:hidden;background:#87CEFA;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    .wrap{position:fixed;inset:0;touch-action:none;}
+    canvas{width:100%;height:100%;display:block;touch-action:none}
+
+    /* HUD */
+    .hud{
+      position:absolute; left:0; right:0; top:0;
+      padding: max(10px, env(safe-area-inset-top)) 10px 0 10px;
+      display:flex; justify-content:space-between; gap:10px;
+      pointer-events:none;
+      z-index:5;
+    }
+    .bar{
+      pointer-events:none;
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      padding:8px 10px;
+      border-radius:12px;
+      background: rgba(255,255,255,.60);
+      border:1px solid rgba(255,255,255,.92);
+      box-shadow: 0 10px 30px var(--shadow);
+      font-weight:900;
+      backdrop-filter: blur(6px);
+    }
+    .btns{display:flex; gap:8px; pointer-events:auto; flex-wrap:wrap; justify-content:flex-end;}
+    .btn{
+      height:38px;
+      padding:0 10px;
+      border-radius:12px;
+      background: rgba(255,255,255,.75);
+      border:1px solid rgba(255,255,255,.95);
+      box-shadow: 0 10px 30px var(--shadow);
+      font-weight:900;
+      display:flex; align-items:center; gap:8px;
+      user-select:none;
+      -webkit-tap-highlight-color:transparent;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    .btn:active{transform:translateY(1px); filter:brightness(.96)}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 10px rgba(46,196,255,.7)}
+    .dot.p{background:var(--gem);box-shadow:0 0 10px rgba(142,91,255,.6)}
+    .dot.g{background:var(--good);box-shadow:0 0 10px rgba(55,209,122,.6)}
+    .dot.r{background:var(--bad);box-shadow:0 0 10px rgba(255,74,107,.6)}
+
+    /* Buff chips */
+    .chips{
+      position:absolute;
+      right:10px;
+      top: calc(54px + max(10px, env(safe-area-inset-top)));
+      display:flex;
+      gap:8px;
+      z-index:6;
+      pointer-events:none;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+    .chip{
+      padding:7px 10px;
+      border-radius:999px;
+      background: rgba(255,255,255,.72);
+      border:1px solid rgba(255,255,255,.95);
+      box-shadow: 0 10px 30px var(--shadow);
+      font-weight:1000;
+      font-size:12px;
+      display:none;
+      align-items:center;
+      gap:6px;
+    }
+    .chip.on{display:inline-flex}
+
+    /* Toast */
+    .toast{
+      position:absolute; left:50%;
+      bottom: max(10px, env(safe-area-inset-bottom));
+      transform:translateX(-50%);
+      padding:10px 12px;
+      border-radius:999px;
+      background: rgba(0,0,0,.45);
+      color: rgba(255,255,255,.95);
+      font-weight:800;
+      font-size:13px;
+      opacity:0;
+      transition:.16s opacity ease;
+      pointer-events:none;
+      z-index:10;
+      max-width: calc(100% - 20px);
+      text-align:center;
+    }
+    .toast.on{opacity:1}
+
+    /* Start overlay */
+    .start{
+      position:absolute; inset:0;
+      display:flex; align-items:center; justify-content:center;
+      padding:16px;
+      background: rgba(0,0,0,.18);
+      backdrop-filter: blur(4px);
+      z-index:20;
+    }
+    .card{
+      width:min(560px,100%);
+      border-radius:18px;
+      background: rgba(255,255,255,.84);
+      border:1px solid rgba(255,255,255,.95);
+      box-shadow: 0 18px 60px rgba(0,0,0,.25);
+      padding:14px;
+      text-align:center;
+    }
+    .card h1{margin:6px 0 8px;font-size:18px}
+    .card p{margin:0 0 12px;color:rgba(0,0,0,.65);font-weight:700;font-size:13px;line-height:1.35}
+    .big{
+      display:inline-flex; align-items:center; justify-content:center; gap:8px;
+      padding:12px 14px;
+      border-radius:14px;
+      background: var(--blue);
+      color:white;
+      font-weight:1000;
+      border:0;
+      box-shadow: 0 10px 25px rgba(0,0,0,.20);
+      cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .big:active{transform:translateY(1px); filter:brightness(.96)}
+    .big.secondary{background: rgba(0,0,0,.10); color: rgba(0,0,0,.88); border:1px solid rgba(0,0,0,.10); box-shadow:none}
+
+    /* Modals */
+    .modal{
+      position:absolute; inset:0;
+      display:none;
+      align-items:flex-end;
+      justify-content:center;
+      padding:10px;
+      background: rgba(0,0,0,.35);
+      backdrop-filter: blur(6px);
+      z-index:30;
+    }
+    .modal.on{display:flex}
+    .sheet{
+      width:min(920px,100%);
+      max-height: calc(100% - max(18px, env(safe-area-inset-top)));
+      overflow:hidden;
+      border-radius:18px;
+      background: rgba(255,255,255,.92);
+      border:1px solid rgba(255,255,255,.95);
+      box-shadow: 0 18px 70px rgba(0,0,0,.28);
+      display:flex; flex-direction:column;
+    }
+    .sheetTop{
+      padding:12px 14px;
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      border-bottom:1px solid rgba(0,0,0,.08);
+    }
+    .sheetTop h2{margin:0;font-size:16px}
+    .sheetBody{padding:12px 14px 14px; overflow:auto; -webkit-overflow-scrolling:touch}
+
+    .grid{display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px}
+    @media (max-width:720px){ .grid{grid-template-columns:1fr;} }
+
+    .item{
+      padding:12px;
+      border-radius:14px;
+      background: rgba(0,0,0,.04);
+      border:1px solid rgba(0,0,0,.08);
+      display:flex; flex-direction:column; gap:8px;
+    }
+    .head{display:flex; justify-content:space-between; gap:10px; align-items:flex-start}
+    .tag{
+      display:inline-flex; align-items:center;
+      padding:4px 10px;
+      border-radius:999px;
+      background: rgba(0,0,0,.06);
+      border:1px solid rgba(0,0,0,.10);
+      font-weight:900;
+      font-size:12px;
+      white-space:nowrap;
+    }
+    .price{font-weight:1000;color:#b06b00}
+    .muted{color:rgba(0,0,0,.62);font-weight:700;font-size:12.5px;line-height:1.35}
+    .row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:2px;flex-wrap:wrap}
+    .mini{
+      padding:10px 10px;
+      border-radius:12px;
+      background: var(--good);
+      color:white;
+      font-weight:1000;
+      border:0;
+      cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+      box-shadow: 0 10px 25px rgba(0,0,0,.18);
+    }
+    .mini:active{transform:translateY(1px); filter:brightness(.96)}
+    .mini:disabled{opacity:.45; cursor:not-allowed; box-shadow:none}
+    .mini.gray{background: var(--blue)}
+    .mini.purple{background: var(--gem)}
+    .mini.red{background: var(--bad)}
+
+    .tabs{display:flex; gap:10px; margin-bottom:12px}
+    .tab{
+      flex:1;
+      padding:10px 12px;
+      border-radius:12px;
+      background: rgba(0,0,0,.04);
+      border:1px solid rgba(0,0,0,.10);
+      font-weight:1000;
+      text-align:center;
+      user-select:none;
+      cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .tab.on{background: var(--blue); color:white; border-color: rgba(0,0,0,0)}
+    .rar{
+      padding:4px 8px;
+      border-radius:999px;
+      font-weight:1000;
+      font-size:12px;
+      border:1px solid rgba(0,0,0,.10);
+      background: rgba(255,255,255,.75);
+      white-space:nowrap;
+    }
+    .rar.common{color:#222}
+    .rar.uncommon{color:#0B6E8D}
+    .rar.rare{color:#3C2AAE}
+    .rar.legendary{color:#9A6A00}
+    .rar.mythic{color:#5C1FB4}
+
+    /* Banner */
+    .banner{
+      position:absolute;
+      left:50%;
+      top: calc(58px + max(10px, env(safe-area-inset-top)));
+      transform:translateX(-50%);
+      padding:10px 14px;
+      border-radius:999px;
+      background: rgba(255,255,255,.88);
+      border:1px solid rgba(255,255,255,.95);
+      box-shadow: 0 16px 55px rgba(0,0,0,.20);
+      font-weight:1000;
+      opacity:0;
+      pointer-events:none;
+      z-index:12;
+    }
+    .banner.on{animation:pop 1.2s ease forwards;}
+    @keyframes pop{
+      0%{opacity:0; transform:translateX(-50%) translateY(-10px) scale(.92)}
+      20%{opacity:1; transform:translateX(-50%) translateY(0) scale(1.02)}
+      60%{opacity:1; transform:translateX(-50%) translateY(0) scale(1)}
+      100%{opacity:0; transform:translateX(-50%) translateY(-10px) scale(.96)}
+    }
+
+    /* Chest */
+    .chestWrap{
+      display:flex; align-items:center; justify-content:center;
+      padding:14px;
+      gap:12px;
+      flex-direction:column;
+      text-align:center;
+    }
+    .chestArea{
+      width:min(360px, 100%);
+      height:220px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      position:relative;
+    }
+    .chest{
+      width:160px;
+      height:120px;
+      border-radius:18px;
+      background: linear-gradient(180deg, rgba(255,196,58,.95), rgba(226,146,21,.95));
+      border:1px solid rgba(0,0,0,.10);
+      box-shadow: 0 18px 70px rgba(0,0,0,.25);
+      position:relative;
+      transform:translateY(0) scale(1);
+      transition: transform .16s ease, filter .16s ease;
+      cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .chest:active{transform:translateY(2px) scale(.99); filter:brightness(.96)}
+    .chest:before{
+      content:"";
+      position:absolute;
+      left:12px; right:12px;
+      top:48px;
+      height:10px;
+      border-radius:999px;
+      background: rgba(0,0,0,.18);
+    }
+    .lock{
+      position:absolute;
+      width:34px; height:34px;
+      left:50%; top:42px;
+      transform:translateX(-50%);
+      border-radius:10px;
+      background: rgba(255,255,255,.85);
+      border:1px solid rgba(0,0,0,.10);
+      box-shadow: 0 12px 30px rgba(0,0,0,.18);
+      display:flex; align-items:center; justify-content:center;
+      font-weight:1000;
+    }
+    .shine{
+      position:absolute;
+      inset:-10px;
+      border-radius:28px;
+      background: radial-gradient(circle at 30% 20%, rgba(255,255,255,.55), transparent 50%),
+                  radial-gradient(circle at 70% 50%, rgba(255,255,255,.25), transparent 55%);
+      pointer-events:none;
+      opacity:.8;
+    }
+    .openAnim{
+      animation: chestOpen .8s ease forwards;
+    }
+    @keyframes chestOpen{
+      0%{transform:translateY(0) scale(1)}
+      30%{transform:translateY(-6px) scale(1.03)}
+      55%{transform:translateY(0) scale(1.02)}
+      100%{transform:translateY(0) scale(1)}
+    }
+
+    input[type="number"], input[type="password"]{
+      width:100%;
+      padding:12px;
+      border-radius:12px;
+      border:1px solid rgba(0,0,0,.12);
+      font-weight:900;
+      background:rgba(255,255,255,.9);
+      outline:none;
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <canvas id="c"></canvas>
+
+  <div class="hud">
+    <div class="bar">
+      <span>Stage <span id="uiStage">1</span></span>
+      <span>LvL <span id="uiWave">1</span>/<span id="uiWaveInStage">5</span></span>
+      <span>🪙 <span id="uiCoins">0</span></span>
+      <span>💎 <span id="uiGems">0</span></span>
+      <span>🏆 <span id="uiBest">0</span></span>
+    </div>
+
+    <div class="btns">
+      <div class="btn" id="btnShop"><span class="dot"></span>Shop</div>
+      <div class="btn" id="btnPets"><span class="dot p"></span>Pets</div>
+      <div class="btn" id="btnAdmin"><span class="dot r"></span>Admin</div>
+      <div class="btn" id="btnPause"><span class="dot g"></span>⏸</div>
+    </div>
+  </div>
+
+  <div class="chips">
+    <div class="chip" id="chipShield">🛡 Щит</div>
+    <div class="chip" id="chipFrenzy">⚡ Френзи <span id="chipFrenzyT">0</span>s</div>
+  </div>
+
+  <div class="banner" id="banner">НОВЫЙ РЕКОРД!</div>
+  <div class="toast" id="toast"></div>
+
+  <div class="start" id="start">
+    <div class="card">
+      <div style="font-weight:1000; color:rgba(0,0,0,.75)">Ball Blast (Mobile) + Pets + Stages</div>
+      <h1 id="startTitle">Зажал → веди пальцем</h1>
+      <p id="startDesc">Пушка стреляет сама. Этап = 5 уровней. Проиграл → откат на 1-й уровень этапа.</p>
+      <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap">
+        <button class="big" id="btnStart">▶ Играть</button>
+        <button class="big secondary" id="btnReset">↺ Сброс</button>
+      </div>
+      <p style="margin-top:10px;font-size:12px;opacity:.85">После каждого этапа — сундук с наградой 🎁</p>
+    </div>
+  </div>
+
+  <!-- SHOP -->
+  <div class="modal" id="mShop">
+    <div class="sheet">
+      <div class="sheetTop">
+        <div>
+          <h2>Shop</h2>
+          <div class="muted">Апгрейды пушки (монеты).</div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center">
+          <div class="tag">🪙 <span id="uiCoins2">0</span></div>
+          <div class="btn" id="closeShop"><span class="dot"></span>Закрыть</div>
+        </div>
+      </div>
+      <div class="sheetBody">
+        <div class="grid" id="shopGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PETS -->
+  <div class="modal" id="mPets">
+    <div class="sheet">
+      <div class="sheetTop">
+        <div>
+          <h2>Pets</h2>
+          <div class="muted">Рулетка за гемы. Питомцы дают буст к урону + монетам.</div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center">
+          <div class="tag">💎 <span id="uiGems2">0</span></div>
+          <div class="btn" id="closePets"><span class="dot p"></span>Закрыть</div>
+        </div>
+      </div>
+      <div class="sheetBody">
+        <div class="tabs">
+          <div class="tab on" id="tabSpin">Рулетка</div>
+          <div class="tab" id="tabInv">Инвентарь</div>
+        </div>
+
+        <div id="spinPanel">
+          <div class="item">
+            <div class="head">
+              <div>
+                <div style="font-weight:1000">Текущий питомец: <span id="activePetName">—</span></div>
+                <div class="muted">Бафы: <b>Урон</b> <span id="petDmg">0%</span> • <b>Монеты</b> <span id="petCoin">0%</span></div>
+              </div>
+              <div><span class="rar" id="activePetRar">—</span></div>
+            </div>
+            <div class="muted">Шансы: Common 60% • Uncommon 22% • Rare 12% • Legendary 5% • Mythic 1%</div>
+            <div class="row">
+              <button class="mini purple" id="spin1">Крутить x1 (💎 25)</button>
+              <button class="mini purple" id="spin10">Крутить x10 (💎 220)</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="invPanel" style="display:none">
+          <div class="grid" id="invGrid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN -->
+  <div class="modal" id="mAdmin">
+    <div class="sheet">
+      <div class="sheetTop">
+        <div>
+          <h2>Admin</h2>
+          <div class="muted">Локально на устройстве (чит). Пароль: <b>112</b></div>
+        </div>
+        <div class="btn" id="closeAdmin"><span class="dot r"></span>Закрыть</div>
+      </div>
+      <div class="sheetBody">
+        <div class="item">
+          <div style="font-weight:1000">Пароль</div>
+          <input id="adminPass" type="password" placeholder="112" />
+          <div style="height:10px"></div>
+
+          <div class="grid">
+            <div class="item">
+              <div style="font-weight:1000">Выдать монеты</div>
+              <div class="muted">Сколько добавить 🪙</div>
+              <input id="giveCoins" type="number" inputmode="numeric" value="5000" />
+              <button class="mini" id="btnGiveCoins">Выдать 🪙</button>
+            </div>
+
+            <div class="item">
+              <div style="font-weight:1000">Выдать гемы</div>
+              <div class="muted">Сколько добавить 💎</div>
+              <input id="giveGems" type="number" inputmode="numeric" value="500" />
+              <button class="mini purple" id="btnGiveGems">Выдать 💎</button>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:8px">
+            <button class="mini red" id="btnAdminMax">MAX апгрейды</button>
+            <button class="mini gray" id="btnAdminUnlockPet">Выдать случайного питомца</button>
+          </div>
+
+          <div class="muted" style="margin-top:10px">
+            ⚠️ Это не серверная защита. Любой может открыть файл у себя и читерить.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHEST -->
+  <div class="modal" id="mChest">
+    <div class="sheet">
+      <div class="sheetTop">
+        <div>
+          <h2>Сундук этапа</h2>
+          <div class="muted">Открой сундук, чтобы продолжить.</div>
+        </div>
+        <div class="tag">Stage <span id="uiChestStage">1</span></div>
+      </div>
+      <div class="sheetBody">
+        <div class="chestWrap">
+          <div style="font-weight:1000;font-size:14px">Этап пройден! 🎉</div>
+          <div class="muted">Тапни по сундуку</div>
+
+          <div class="chestArea">
+            <div class="chest" id="chestBtn">
+              <div class="shine"></div>
+              <div class="lock">🔒</div>
+            </div>
+          </div>
+
+          <div class="item" id="rewardBox" style="display:none">
+            <div style="font-weight:1000" id="rewardTitle">Награда</div>
+            <div class="muted" id="rewardDesc">—</div>
+          </div>
+
+          <div class="row" style="justify-content:center">
+            <button class="mini gray" id="btnChestContinue" disabled>Продолжить ▶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  const $ = (id)=>document.getElementById(id);
+  const canvas = $('c');
+  const ctx = canvas.getContext('2d', {alpha:true});
+
+  const uiStage = $('uiStage');
+  const uiWave = $('uiWave');
+  const uiWaveInStage = $('uiWaveInStage');
+  const uiCoins = $('uiCoins');
+  const uiGems  = $('uiGems');
+  const uiBest  = $('uiBest');
+  const uiCoins2= $('uiCoins2');
+  const uiGems2 = $('uiGems2');
+
+  const toastEl = $('toast');
+  const bannerEl= $('banner');
+
+  const start = $('start');
+  const btnStart = $('btnStart');
+  const btnReset = $('btnReset');
+  const startTitle = $('startTitle');
+  const startDesc = $('startDesc');
+
+  const btnPause = $('btnPause');
+  const btnShop  = $('btnShop');
+  const btnPets  = $('btnPets');
+  const btnAdmin = $('btnAdmin');
+
+  const mShop = $('mShop');
+  const closeShop = $('closeShop');
+  const shopGrid = $('shopGrid');
+
+  const mPets = $('mPets');
+  const closePets = $('closePets');
+
+  const tabSpin = $('tabSpin');
+  const tabInv  = $('tabInv');
+  const spinPanel = $('spinPanel');
+  const invPanel  = $('invPanel');
+  const invGrid   = $('invGrid');
+
+  const spin1 = $('spin1');
+  const spin10= $('spin10');
+
+  const activePetName = $('activePetName');
+  const activePetRar  = $('activePetRar');
+  const petDmgEl = $('petDmg');
+  const petCoinEl= $('petCoin');
+
+  // Admin elements
+  const mAdmin = $('mAdmin');
+  const closeAdmin = $('closeAdmin');
+  const adminPass = $('adminPass');
+  const giveCoins = $('giveCoins');
+  const giveGems  = $('giveGems');
+  const btnGiveCoins = $('btnGiveCoins');
+  const btnGiveGems  = $('btnGiveGems');
+  const btnAdminMax  = $('btnAdminMax');
+  const btnAdminUnlockPet = $('btnAdminUnlockPet');
+
+  // Chest elements
+  const mChest = $('mChest');
+  const uiChestStage = $('uiChestStage');
+  const chestBtn = $('chestBtn');
+  const rewardBox = $('rewardBox');
+  const rewardTitle = $('rewardTitle');
+  const rewardDesc  = $('rewardDesc');
+  const btnChestContinue = $('btnChestContinue');
+
+  // Buff chips
+  const chipShield = $('chipShield');
+  const chipFrenzy = $('chipFrenzy');
+  const chipFrenzyT= $('chipFrenzyT');
+
+  // Utils
+  const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const rand=(a,b)=>a+Math.random()*(b-a);
+  const irand=(a,b)=>Math.floor(rand(a,b+1));
+  const now=()=>performance.now();
+
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('on');
+    clearTimeout(toastEl._t);
+    toastEl._t = setTimeout(()=>toastEl.classList.remove('on'), 1500);
+  }
+  function banner(msg){
+    bannerEl.textContent = msg;
+    bannerEl.classList.remove('on');
+    void bannerEl.offsetWidth;
+    bannerEl.classList.add('on');
+  }
+
+  // Resize
+  const W = {w:360,h:640};
+  function resize(){
+    const r = canvas.getBoundingClientRect();
+    canvas.width  = Math.floor(r.width  * DPR);
+    canvas.height = Math.floor(r.height * DPR);
+    W.w = r.width; W.h = r.height;
+  }
+  addEventListener('resize', resize, {passive:true});
+  resize();
+
+  // Save
+  const KEY='bb_mobile_pets_stages_chests_admin_v1';
+  const defSave=()=>({
+    coins: 0,
+    gems:  0,
+    bestWave: 0,
+    up: { dmg:0, fire:0, speed:0, cannons:0, crit:0, magnet:0 },
+    pets: { active:'none', owned:{ none:{lvl:1,copies:1} } }
+  });
+  function load(){
+    try{
+      const raw=localStorage.getItem(KEY);
+      if(!raw) return defSave();
+      const s=JSON.parse(raw);
+      const b=defSave();
+      s.coins = Number(s.coins ?? b.coins) || 0;
+      s.gems  = Number(s.gems  ?? b.gems ) || 0;
+      s.bestWave = Number(s.bestWave ?? b.bestWave) || 0;
+      s.up = {...b.up, ...(s.up||{})};
+      s.pets = {...b.pets, ...(s.pets||{})};
+      s.pets.owned = (s.pets.owned && typeof s.pets.owned==='object') ? s.pets.owned : b.pets.owned;
+      if(!s.pets.owned.none) s.pets.owned.none={lvl:1,copies:1};
+      if(!s.pets.active) s.pets.active='none';
+      return s;
+    }catch{ return defSave(); }
+  }
+  let SAVE=load();
+  const save=()=>localStorage.setItem(KEY, JSON.stringify(SAVE));
+
+  function setOverlayText(title, desc){
+    startTitle.textContent = title;
+    startDesc.textContent = desc;
+  }
+
+  function hardReset(){
+    SAVE = defSave();
+    save();
+    toast('Сброшено ✅');
+    setOverlayText('Зажал → веди пальцем','Прогресс сброшен. Нажми Играть.');
+    running=false; paused=false;
+    start.style.display='flex';
+    syncUI();
+  }
+
+  // Pets
+  const RAR_ORDER = {common:1,uncommon:2,rare:3,legendary:4,mythic:5};
+  const RAR = [
+    {id:'common',    name:'Обычный',     p:0.60},
+    {id:'uncommon',  name:'Необычный',   p:0.22},
+    {id:'rare',      name:'Редкий',      p:0.12},
+    {id:'legendary', name:'Легендарный', p:0.05},
+    {id:'mythic',    name:'Мифический',  p:0.01},
+  ];
+  const PETS = [
+    {id:'slime', name:'Слайм', rar:'common', dmg:2, coin:4},
+    {id:'cat', name:'Кот', rar:'common', dmg:3, coin:3},
+    {id:'dog', name:'Пёс', rar:'common', dmg:3, coin:4},
+    {id:'bee', name:'Пчела', rar:'common', dmg:4, coin:2},
+    {id:'frog', name:'Лягушка', rar:'common', dmg:2, coin:5},
+    {id:'fox', name:'Лис', rar:'uncommon', dmg:6, coin:7},
+    {id:'owl', name:'Сова', rar:'uncommon', dmg:5, coin:9},
+    {id:'bat', name:'Летучая мышь', rar:'uncommon', dmg:7, coin:6},
+    {id:'drone', name:'Дрон', rar:'uncommon', dmg:8, coin:5},
+    {id:'panther', name:'Пантера', rar:'rare', dmg:12, coin:10},
+    {id:'mecha', name:'Меха', rar:'rare', dmg:14, coin:8},
+    {id:'djinn', name:'Джинн', rar:'rare', dmg:10, coin:14},
+    {id:'phoenix', name:'Феникс', rar:'legendary', dmg:22, coin:16},
+    {id:'dragon', name:'Дракон', rar:'legendary', dmg:26, coin:14},
+    {id:'orb', name:'Золотой Орб', rar:'legendary', dmg:18, coin:22},
+    {id:'voidlord', name:'ВойдЛорд', rar:'mythic', dmg:40, coin:28},
+    {id:'celestial', name:'Небожитель', rar:'mythic', dmg:34, coin:36},
+  ];
+  const rarName=(id)=>RAR.find(r=>r.id===id)?.name || id;
+  const petById=(id)=>PETS.find(p=>p.id===id) || null;
+
+  function rollRarity(){
+    const r=Math.random(); let acc=0;
+    for(const t of RAR){ acc+=t.p; if(r<=acc) return t.id; }
+    return 'common';
+  }
+  function rollPet(){
+    const rar=rollRarity();
+    const pool=PETS.filter(p=>p.rar===rar);
+    return pool[irand(0,pool.length-1)];
+  }
+  function addPet(p){
+    if(!SAVE.pets.owned[p.id]){
+      SAVE.pets.owned[p.id]={lvl:1,copies:1};
+    } else {
+      const d=SAVE.pets.owned[p.id];
+      d.copies++;
+      const need = 3 + Math.floor((d.lvl-1)*1.6);
+      if(d.copies >= need){
+        d.copies -= need;
+        d.lvl++;
+        toast(`Питомец ${p.name} апнут до LVL ${d.lvl}!`);
+      }
+    }
+    if(SAVE.pets.active==='none') SAVE.pets.active=p.id;
+    save();
+  }
+  function petBuff(){
+    const id=SAVE.pets.active || 'none';
+    if(id==='none') return {name:'Нет', rar:'common', lvl:1, dmgPct:0, coinPct:0};
+    const p=petById(id);
+    if(!p) return {name:'Нет', rar:'common', lvl:1, dmgPct:0, coinPct:0};
+    const lvl=SAVE.pets.owned[id]?.lvl || 1;
+    const mult = 1 + (lvl-1)*0.18;
+    return {
+      name:p.name, rar:p.rar, lvl,
+      dmgPct: Math.round(p.dmg*mult),
+      coinPct: Math.round(p.coin*mult)
+    };
+  }
+
+  // Shop
+  const SHOP = [
+    {id:'dmg', name:'Урон', tag:'DMG', desc:'+урон по шарам', base:70, scale:1.55, max:60},
+    {id:'fire', name:'Скорострельность', tag:'FIRE', desc:'стреляешь чаще', base:90, scale:1.60, max:55},
+    {id:'speed', name:'Скорость пуль', tag:'SPD', desc:'пули быстрее', base:80, scale:1.50, max:50},
+    {id:'cannons', name:'+Пушка', tag:'MULTI', desc:'добавляет ствол', base:220, scale:1.85, max:6},
+    {id:'crit', name:'Крит', tag:'CRIT', desc:'шанс крита', base:140, scale:1.70, max:40},
+    {id:'magnet', name:'Магнит', tag:'MAG', desc:'подтягивает монеты', base:120, scale:1.65, max:40},
+  ];
+  const up=(id)=>SAVE.up[id]||0;
+  const cost=(it)=>Math.floor(it.base * Math.pow(it.scale, up(it.id)));
+  const maxed=(id)=>up(id) >= (SHOP.find(s=>s.id===id)?.max ?? 999);
+
+  // ===== Stages =====
+  const LEVELS_PER_STAGE = 5;
+  function stageOf(w){ return Math.floor((w-1)/LEVELS_PER_STAGE)+1; }
+  function stageStartWave(st){ return (st-1)*LEVELS_PER_STAGE + 1; }
+  function waveInStage(w){ return ((w-1)%LEVELS_PER_STAGE) + 1; }
+
+  // Game State
+  let running=false, paused=false;
+  let wave=1;
+  let pendingStartWave=1;
+
+  // Stage chest flow
+  let awaitingChest=false;
+  let nextWaveAfterChest=1;
+  let chestOpened=false;
+
+  // Buffs (extra cool thing)
+  const buffs = {
+    shield:false,      // blocks 1 hit
+    frenzyT:0          // seconds
+  };
+
+  const player={x:0,y:0,targetX:null};
+
+  const ST={dmg:1, fireMs:150, spd:900, cannons:1, crit:0.05, magnet:0, coinMult:1};
+
+  const bullets=[]; // {x,y,vx,vy,r,dmg,crit}
+  const balls=[];   // {x,y,vx,vy,r,hp,maxHp,boss}
+  const loot=[];    // {x,y,vx,vy,type,r,grounded}
+  const particles=[];
+  const powerups=[]; // {x,y,vx,vy,type,r,grounded} type: 'shield'|'frenzy'
+
+  function applyStats(){
+    const pb=petBuff();
+    const dmg = 1 + up('dmg')*0.9;
+    const fire = 160 / (1 + up('fire')*0.06);
+    const spd  = 900 + up('speed')*38;
+    const cann = 1 + up('cannons');
+    const crit = 0.05 + up('crit')*0.007;
+    const mag  = up('magnet')*18;
+
+    ST.dmg = dmg * (1 + pb.dmgPct/100);
+    // frenzy: x2 fire rate (half delay)
+    const frenzyMul = (buffs.frenzyT > 0) ? 0.55 : 1.0;
+    ST.fireMs = clamp(fire * frenzyMul, 45, 220);
+    ST.spd = clamp(spd, 900, 1900);
+    ST.cannons = clamp(cann, 1, 7);
+    ST.crit = clamp(crit, 0.05, 0.35);
+    ST.magnet = mag;
+    ST.coinMult = 1 + pb.coinPct/100;
+  }
+
+  function syncUI(){
+    const st = stageOf(wave);
+    uiStage.textContent = st;
+    uiWave.textContent = waveInStage(wave);
+    uiWaveInStage.textContent = LEVELS_PER_STAGE;
+
+    uiCoins.textContent = SAVE.coins;
+    uiGems.textContent  = SAVE.gems;
+    uiBest.textContent  = SAVE.bestWave;
+
+    uiCoins2.textContent = SAVE.coins;
+    uiGems2.textContent  = SAVE.gems;
+
+    const pb=petBuff();
+    activePetName.textContent = `${pb.name} (LVL ${pb.lvl})`;
+    activePetRar.textContent  = rarName(pb.rar);
+    activePetRar.className = `rar ${pb.rar}`;
+    petDmgEl.textContent = pb.dmgPct + '%';
+    petCoinEl.textContent= pb.coinPct + '%';
+
+    chipShield.classList.toggle('on', buffs.shield);
+    chipFrenzy.classList.toggle('on', buffs.frenzyT > 0);
+    chipFrenzyT.textContent = Math.ceil(buffs.frenzyT);
+  }
+
+  // Background
+  function drawBG(time){
+    const g = ctx.createLinearGradient(0,0,0,W.h);
+    g.addColorStop(0, '#86CDF7');
+    g.addColorStop(0.65, '#CFEFFF');
+    g.addColorStop(1, '#EAF8FF');
+    ctx.fillStyle=g;
+    ctx.fillRect(0,0,W.w,W.h);
+
+    ctx.save();
+    ctx.globalAlpha=0.9;
+    for(let i=0;i<4;i++){
+      const x = (i*220 + (time*0.02)) % (W.w+260) - 130;
+      const y = 80 + i*40;
+      cloud(x,y, 1.0 - i*0.08);
+    }
+    ctx.restore();
+
+    mountain(0.78, '#87B7D9');
+    mountain(0.88, '#6DA3C9');
+
+    ctx.fillStyle='#34C759';
+    ctx.fillRect(0, W.h-90, W.w, 90);
+    ctx.fillStyle='#2FB355';
+    ctx.fillRect(0, W.h-70, W.w, 70);
+  }
+  function cloud(x,y,s){
+    ctx.fillStyle='rgba(255,255,255,.95)';
+    ctx.beginPath();
+    ctx.ellipse(x, y, 40*s, 22*s, 0, 0, Math.PI*2);
+    ctx.ellipse(x+35*s, y+4*s, 46*s, 26*s, 0, 0, Math.PI*2);
+    ctx.ellipse(x+80*s, y, 40*s, 22*s, 0, 0, Math.PI*2);
+    ctx.closePath(); ctx.fill();
+  }
+  function mountain(hMul, color){
+    const baseY = W.h-90;
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    ctx.moveTo(0, baseY);
+    const peaks = 5;
+    for(let i=0;i<=peaks;i++){
+      const px = (i/peaks)*W.w;
+      const py = baseY - (120*hMul) - (i%2?40:0);
+      ctx.lineTo(px, py);
+    }
+    ctx.lineTo(W.w, baseY);
+    ctx.closePath();
+    ctx.globalAlpha=0.65;
+    ctx.fill();
+    ctx.globalAlpha=1;
+  }
+
+  // FX
+  function burst(x,y,count=18,power=6,hue=50){
+    for(let i=0;i<count;i++){
+      const a=rand(0,Math.PI*2);
+      const s=rand(1.2,power);
+      particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(18,42),kind:'spark',hue:hue+rand(-30,30),size:rand(2,3.6)});
+    }
+  }
+  function confetti(){
+    for(let i=0;i<80;i++){
+      particles.push({x:rand(0,W.w),y:rand(-30,10),vx:rand(-1.6,1.6),vy:rand(1.2,3.4),life:rand(70,120),kind:'conf',hue:rand(0,360),size:rand(2.2,4.2),rot:rand(0,Math.PI*2),vr:rand(-0.2,0.2)});
+    }
+  }
+  function stepParticles(dt60){
+    for(let i=particles.length-1;i>=0;i--){
+      const p=particles[i];
+      p.life-=dt60;
+      if(p.life<=0){particles.splice(i,1);continue;}
+      if(p.kind==='spark'){
+        p.vy += 0.11*dt60;
+        p.x += p.vx*dt60;
+        p.y += p.vy*dt60;
+        p.vx*=0.98; p.vy*=0.98;
+      } else {
+        p.vy += 0.03*dt60;
+        p.x += p.vx*dt60;
+        p.y += p.vy*dt60;
+        p.rot += (p.vr||0)*dt60;
+      }
+    }
+  }
+  function drawParticles(){
+    for(const p of particles){
+      if(p.kind==='spark'){
+        ctx.save();
+        const a=clamp(p.life/50,0,1);
+        ctx.globalAlpha=0.9*a;
+        ctx.fillStyle=`hsla(${p.hue},95%,55%,1)`;
+        ctx.shadowColor=`hsla(${p.hue},95%,55%,.45)`;
+        ctx.shadowBlur=12;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+        ctx.restore();
+      } else {
+        ctx.save();
+        const a=clamp(p.life/130,0,1);
+        ctx.globalAlpha=0.95*a;
+        ctx.translate(p.x,p.y);
+        ctx.rotate(p.rot||0);
+        ctx.fillStyle=`hsla(${p.hue},95%,55%,1)`;
+        ctx.fillRect(-p.size, -p.size*0.6, p.size*2, p.size*1.2);
+        ctx.restore();
+      }
+    }
+  }
+
+  // Spawn wave
+  function spawnWave(w){
+    applyStats();
+
+    // маленькая награда на старт
+    SAVE.coins += Math.floor(10 + w*0.7);
+    if(w % 3 === 0) SAVE.gems += 2;
+    save();
+
+    const count = clamp(2 + Math.floor(w/3), 2, 7);
+    const baseHp = 18 + w*7;
+    const bossChance = clamp(0.06 + w*0.002, 0.06, 0.16);
+
+    for(let i=0;i<count;i++){
+      const r = rand(22, 42) * (Math.random()<0.20?1.25:1.0);
+      const hp = Math.floor(baseHp * rand(0.75, 1.35));
+      const boss = (i===0) && (Math.random() < bossChance);
+      const bhp  = boss ? Math.floor(hp*2.5) : hp;
+
+      balls.push({
+        x: rand(r+16, W.w-r-16),
+        y: rand(140, 240),
+        vx: rand(-1.6, 1.6),
+        vy: rand(-0.6, 0.6),
+        r,
+        hp: bhp,
+        maxHp: bhp,
+        boss
+      });
+    }
+    syncUI();
+  }
+
+  function maybeDropPowerup(ball){
+    // редко с боссов / иногда с обычных
+    const base = ball.boss ? 0.22 : 0.04;
+    if(Math.random() > base) return;
+
+    const type = (Math.random() < 0.55) ? 'shield' : 'frenzy';
+    powerups.push({
+      x: ball.x, y: ball.y,
+      vx: rand(-110,110),
+      vy: rand(-520,-260),
+      type,
+      r: 10,
+      grounded:false
+    });
+  }
+
+  function splitAndLoot(ball){
+    // монеты быстрее/больше + лежат на земле
+    const coinsDrop = clamp(Math.floor(ball.maxHp/7), 5, 40);
+    for(let i=0;i<coinsDrop;i++){
+      loot.push({
+        x:ball.x, y:ball.y,
+        vx:rand(-120,120),
+        vy:rand(-520,-220),
+        type:'coin',
+        r:7.5,
+        grounded:false
+      });
+    }
+    const gemChance = ball.boss ? 0.85 : 0.16;
+    if(Math.random() < gemChance){
+      loot.push({
+        x:ball.x, y:ball.y,
+        vx:rand(-110,110),
+        vy:rand(-520,-260),
+        type:'gem',
+        r:8.5,
+        grounded:false
+      });
+    }
+
+    maybeDropPowerup(ball);
+
+    // split
+    if(ball.r > 24){
+      const nr = ball.r*0.72;
+      const nh = Math.max(8, Math.floor(ball.maxHp*0.45));
+      for(const s of [-1,1]){
+        balls.push({
+          x: ball.x + s*nr*0.3,
+          y: ball.y,
+          vx: ball.vx + s*rand(1.0,2.0),
+          vy: rand(-1.2,-0.2),
+          r: nr,
+          hp: Math.floor(nh*0.85),
+          maxHp: nh,
+          boss:false
+        });
+      }
+    }
+  }
+
+  // Shooting
+  let lastShot = 0;
+  function shoot(){
+    const t = now();
+    if(t - lastShot < ST.fireMs) return;
+    lastShot = t;
+
+    const n = ST.cannons;
+    const spread = 0.16;
+    for(let i=0;i<n;i++){
+      const k = (n===1)?0:(i-(n-1)/2);
+      const vx = k * (ST.spd*spread*0.001);
+      const vy = -ST.spd;
+      const crit = Math.random() < ST.crit;
+      const dmg  = ST.dmg * (crit ? 1.8 : 1);
+      bullets.push({x:player.x,y:player.y-55,vx,vy,r:3.6,dmg,crit});
+    }
+  }
+
+  // Input (drag)
+  function clientXToWorldX(cx){
+    const r = canvas.getBoundingClientRect();
+    return (cx - r.left) * (W.w / r.width);
+  }
+  let dragging=false, pid=null;
+  canvas.addEventListener('pointerdown', (e)=>{
+    if(!running || paused || awaitingChest) return;
+    if(mShop.classList.contains('on') || mPets.classList.contains('on') || mAdmin.classList.contains('on') || mChest.classList.contains('on')) return;
+    dragging=true; pid=e.pointerId;
+    try{ canvas.setPointerCapture(pid); }catch{}
+    player.targetX = clientXToWorldX(e.clientX);
+  }, {passive:false});
+  canvas.addEventListener('pointermove', (e)=>{
+    if(!dragging || e.pointerId!==pid) return;
+    player.targetX = clientXToWorldX(e.clientX);
+  }, {passive:false});
+  function endDrag(e){
+    if(e.pointerId!==pid) return;
+    dragging=false; pid=null;
+    player.targetX=null;
+  }
+  canvas.addEventListener('pointerup', endDrag, {passive:false});
+  canvas.addEventListener('pointercancel', endDrag, {passive:false});
+
+  // Keyboard fallback
+  const keys=new Set();
+  addEventListener('keydown', e=>keys.add(e.key));
+  addEventListener('keyup', e=>keys.delete(e.key));
+  const left=()=>keys.has('ArrowLeft')||keys.has('a')||keys.has('A');
+  const right=()=>keys.has('ArrowRight')||keys.has('d')||keys.has('D');
+
+  // Shop UI
+  function renderShop(){
+    shopGrid.innerHTML='';
+    syncUI();
+    for(const it of SHOP){
+      const lv = up(it.id);
+      const mx = it.max;
+      const isMaxed = lv >= mx;
+      const price = cost(it);
+      const can = SAVE.coins >= price;
+
+      const el=document.createElement('div');
+      el.className='item';
+      el.innerHTML=`
+        <div class="head">
+          <div>
+            <div style="font-weight:1000">${it.name} <span style="opacity:.6">LVL ${lv}/${mx}</span></div>
+            <div style="height:6px"></div>
+            <span class="tag">${it.tag}</span>
+          </div>
+          <div class="price">🪙 ${isMaxed?'MAX':price}</div>
+        </div>
+        <div class="muted">${it.desc}</div>
+        <div class="row">
+          <div class="muted">${isMaxed?'Уже максимум.':(can?'Доступно ✅':'Не хватает 🥲')}</div>
+          <button class="mini" ${isMaxed||!can?'disabled':''}>Купить</button>
+        </div>
+      `;
+      el.querySelector('button').addEventListener('click', ()=>{
+        if(isMaxed) return;
+        const p = cost(it);
+        if(SAVE.coins < p) return;
+        SAVE.coins -= p;
+        SAVE.up[it.id] = lv+1;
+        save();
+        applyStats();
+        burst(W.w*0.5, W.h*0.35, 70, 7.0, 55);
+        confetti();
+        toast(`Куплено: ${it.name}`);
+        renderShop();
+      });
+      shopGrid.appendChild(el);
+    }
+  }
+
+  // Pets UI
+  function renderInv(){
+    invGrid.innerHTML='';
+    const owned = SAVE.pets.owned;
+    const items = Object.keys(owned)
+      .filter(id=>id!=='none')
+      .map(id=>{
+        const p=petById(id);
+        if(!p) return null;
+        return {id,p, lvl:owned[id].lvl, copies:owned[id].copies};
+      })
+      .filter(Boolean)
+      .sort((a,b)=>RAR_ORDER[b.p.rar]-RAR_ORDER[a.p.rar] || b.lvl-a.lvl);
+
+    if(items.length===0){
+      const el=document.createElement('div');
+      el.className='item';
+      el.style.gridColumn='1/-1';
+      el.innerHTML=`<div style="font-weight:1000">Питомцев нет 😢</div><div class="muted">Крути рулетку за гемы 💎</div>`;
+      invGrid.appendChild(el);
+      return;
+    }
+
+    for(const it of items){
+      const active = SAVE.pets.active===it.id;
+      const mult = 1 + (it.lvl-1)*0.18;
+      const dmg = Math.round(it.p.dmg*mult);
+      const coin= Math.round(it.p.coin*mult);
+
+      const el=document.createElement('div');
+      el.className='item';
+      el.innerHTML=`
+        <div class="head">
+          <div>
+            <div style="font-weight:1000">${it.p.name} <span style="opacity:.6">LVL ${it.lvl}</span></div>
+            <div style="height:6px"></div>
+            <span class="rar ${it.p.rar}">${rarName(it.p.rar)}</span>
+            <span class="tag">+${dmg}% DMG</span>
+            <span class="tag">+${coin}% COIN</span>
+          </div>
+          <div style="text-align:right">
+            <div class="price">x${it.copies}</div>
+            <div class="muted" style="font-size:12px">копии</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="muted">${active?'Активен ✅':'Можно активировать.'}</div>
+          <button class="mini gray" ${active?'disabled':''}>Активировать</button>
+        </div>
+      `;
+      el.querySelector('button').addEventListener('click', ()=>{
+        SAVE.pets.active=it.id;
+        save();
+        applyStats();
+        confetti();
+        toast(`Активен: ${it.p.name}`);
+        renderInv();
+        syncUI();
+      });
+      invGrid.appendChild(el);
+    }
+  }
+
+  let spinning=false;
+  function spin(costGems, times){
+    if(spinning) return;
+    if(SAVE.gems < costGems){ toast('Не хватает гемов 💎'); return; }
+    SAVE.gems -= costGems;
+    save();
+
+    spinning=true;
+    const results=[];
+    for(let i=0;i<times;i++) results.push(rollPet());
+    for(const p of results) addPet(p);
+
+    confetti();
+    burst(W.w*0.5, W.h*0.3, 90, 7.5, 200);
+    const best = results.slice().sort((a,b)=>RAR_ORDER[b.rar]-RAR_ORDER[a.rar])[0];
+    toast(times===1 ? `Выпал: ${best.name} (${rarName(best.rar)})` : `x10 готово! Лучший: ${best.name} (${rarName(best.rar)})`);
+    spinning=false;
+
+    renderInv();
+    syncUI();
+  }
+
+  // ===== Admin =====
+  const ADMIN_PASSWORD = '112';
+  function adminOk(){ return (adminPass.value||'').trim() === ADMIN_PASSWORD; }
+
+  btnAdmin.addEventListener('click', ()=>{
+    if(!running) return;
+    paused=true;
+    mAdmin.classList.add('on');
+    adminPass.value='';
+    adminPass.focus?.();
+  });
+  closeAdmin.addEventListener('click', ()=>{ mAdmin.classList.remove('on'); paused=false; });
+  mAdmin.addEventListener('click', (e)=>{ if(e.target===mAdmin){ mAdmin.classList.remove('on'); paused=false; } });
+
+  btnGiveCoins.addEventListener('click', ()=>{
+    if(!adminOk()) return toast('Неверный пароль ❌');
+    const add=Math.max(0, Math.floor(Number(giveCoins.value||0)));
+    if(!add) return toast('Введи число 🪙');
+    SAVE.coins += add;
+    save(); syncUI();
+    confetti(); burst(W.w*0.5, W.h*0.35, 70, 7.0, 55);
+    toast(`+${add} 🪙`);
+  });
+  btnGiveGems.addEventListener('click', ()=>{
+    if(!adminOk()) return toast('Неверный пароль ❌');
+    const add=Math.max(0, Math.floor(Number(giveGems.value||0)));
+    if(!add) return toast('Введи число 💎');
+    SAVE.gems += add;
+    save(); syncUI();
+    confetti(); burst(W.w*0.5, W.h*0.35, 70, 7.0, 290);
+    toast(`+${add} 💎`);
+  });
+  btnAdminMax.addEventListener('click', ()=>{
+    if(!adminOk()) return toast('Неверный пароль ❌');
+    for(const it of SHOP) SAVE.up[it.id] = it.max;
+    save(); applyStats(); syncUI();
+    confetti(); toast('Апгрейды MAX ✅');
+  });
+  btnAdminUnlockPet.addEventListener('click', ()=>{
+    if(!adminOk()) return toast('Неверный пароль ❌');
+    const p = rollPet();
+    addPet(p);
+    save(); applyStats(); syncUI();
+    confetti(); toast(`Выдан питомец: ${p.name}`);
+  });
+
+  // ===== Chest rewards =====
+  function openStageChest(stage){
+    awaitingChest=true;
+    paused=true;
+    chestOpened=false;
+    uiChestStage.textContent = stage;
+    rewardBox.style.display='none';
+    btnChestContinue.disabled=true;
+    chestBtn.classList.remove('openAnim');
+    mChest.classList.add('on');
+  }
+
+  function rollChestReward(stage){
+    // веса: coins 55%, gems 25%, pet 12%, upgrade 8%
+    const r=Math.random();
+    if(r < 0.55){
+      const amount = Math.floor(220 + stage*180 + rand(0, stage*80));
+      return {type:'coins', amount};
+    } else if(r < 0.80){
+      const amount = Math.floor(8 + stage*4 + rand(0, 3+stage));
+      return {type:'gems', amount};
+    } else if(r < 0.92){
+      const pet = rollPet();
+      return {type:'pet', pet};
+    } else {
+      // upgrade
+      const pool = SHOP.filter(it => !maxed(it.id));
+      if(pool.length===0){
+        const amount = Math.floor(300 + stage*220);
+        return {type:'coins', amount};
+      }
+      const it = pool[irand(0, pool.length-1)];
+      return {type:'upgrade', upId: it.id, upName: it.name};
+    }
+  }
+
+  function applyChestReward(rew){
+    if(rew.type==='coins'){
+      SAVE.coins += rew.amount;
+      rewardTitle.textContent = 'Награда: 🪙 Монеты';
+      rewardDesc.textContent = `+${rew.amount} 🪙`;
+      burst(W.w*0.5, W.h*0.28, 100, 7.5, 55);
+      confetti();
+      toast(`Сундук: +${rew.amount} 🪙`);
+    } else if(rew.type==='gems'){
+      SAVE.gems += rew.amount;
+      rewardTitle.textContent = 'Награда: 💎 Гемы';
+      rewardDesc.textContent = `+${rew.amount} 💎`;
+      burst(W.w*0.5, W.h*0.28, 100, 7.5, 290);
+      confetti();
+      toast(`Сундук: +${rew.amount} 💎`);
+    } else if(rew.type==='pet'){
+      addPet(rew.pet);
+      rewardTitle.textContent = 'Награда: 🐾 Питомец';
+      rewardDesc.textContent = `${rew.pet.name} (${rarName(rew.pet.rar)})`;
+      burst(W.w*0.5, W.h*0.28, 120, 8.0, 200);
+      confetti();
+      toast(`Сундук: питомец ${rew.pet.name}`);
+    } else if(rew.type==='upgrade'){
+      SAVE.up[rew.upId] = (SAVE.up[rew.upId]||0) + 1;
+      rewardTitle.textContent = 'Награда: 🔧 Прокачка';
+      rewardDesc.textContent = `${rew.upName} +1 уровень`;
+      burst(W.w*0.5, W.h*0.28, 110, 7.6, 140);
+      confetti();
+      toast(`Сундук: ${rew.upName} +1`);
+    }
+    save();
+    applyStats();
+    syncUI();
+  }
+
+  chestBtn.addEventListener('click', ()=>{
+    if(chestOpened) return;
+    chestOpened=true;
+    chestBtn.classList.add('openAnim');
+
+    // чуть задержка для “приятного” открытия
+    setTimeout(()=>{
+      const stage = Number(uiChestStage.textContent||1);
+      const rew = rollChestReward(stage);
+      rewardBox.style.display='block';
+      applyChestReward(rew);
+      btnChestContinue.disabled=false;
+    }, 380);
+  });
+
+  btnChestContinue.addEventListener('click', ()=>{
+    if(!awaitingChest) return;
+    mChest.classList.remove('on');
+    awaitingChest=false;
+    paused=false;
+
+    // продолжаем: спавним следующий уровень
+    bullets.length=0;
+    balls.length=0;
+    // лут/пауэры оставим лежать? лучше чисто: оставим, чтобы “собирать после сундука” не ломало — очистим
+    loot.length=0;
+    powerups.length=0;
+
+    wave = nextWaveAfterChest;
+    banner(`ЭТАП ${stageOf(wave)}!`);
+    spawnWave(wave);
+    toast(`Stage ${stageOf(wave)} • LvL 1/${LEVELS_PER_STAGE}`);
+    syncUI();
+  });
+
+  // Buttons
+  btnShop.addEventListener('click', ()=>{
+    if(!running) return;
+    paused=true;
+    mShop.classList.add('on');
+    renderShop();
+  });
+  closeShop.addEventListener('click', ()=>{ mShop.classList.remove('on'); paused=false; });
+  mShop.addEventListener('click', (e)=>{ if(e.target===mShop){ mShop.classList.remove('on'); paused=false; } });
+
+  btnPets.addEventListener('click', ()=>{
+    if(!running) return;
+    paused=true;
+    mPets.classList.add('on');
+    tabSpin.classList.add('on'); tabInv.classList.remove('on');
+    spinPanel.style.display='block'; invPanel.style.display='none';
+    renderInv();
+    syncUI();
+  });
+  closePets.addEventListener('click', ()=>{ mPets.classList.remove('on'); paused=false; });
+  mPets.addEventListener('click', (e)=>{ if(e.target===mPets){ mPets.classList.remove('on'); paused=false; } });
+
+  tabSpin.addEventListener('click', ()=>{
+    tabSpin.classList.add('on'); tabInv.classList.remove('on');
+    spinPanel.style.display='block'; invPanel.style.display='none';
+  });
+  tabInv.addEventListener('click', ()=>{
+    tabInv.classList.add('on'); tabSpin.classList.remove('on');
+    invPanel.style.display='block'; spinPanel.style.display='none';
+    renderInv();
+  });
+
+  spin1.addEventListener('click', ()=>spin(25, 1));
+  spin10.addEventListener('click', ()=>spin(220, 10));
+
+  btnPause.addEventListener('click', ()=>{
+    if(!running) return;
+    paused=!paused;
+    toast(paused?'Пауза':'Продолжить');
+  });
+
+  btnReset.addEventListener('click', ()=>hardReset());
+
+  // ===== Run control =====
+  function resetEntities(){
+    bullets.length=0;
+    balls.length=0;
+    particles.length=0;
+    loot.length=0;
+    powerups.length=0;
+  }
+
+  function startRun(fromWave){
+    resize();
+    resetEntities();
+
+    wave = Math.max(1, fromWave|0);
+    player.x = W.w*0.5;
+    player.y = W.h-95;
+    player.targetX = null;
+
+    // сброс временных бафов на старт ранa
+    buffs.shield=false;
+    buffs.frenzyT=0;
+
+    applyStats();
+    spawnWave(wave);
+    running=true;
+    paused=false;
+    awaitingChest=false;
+
+    start.style.display='none';
+    toast(`Старт! Stage ${stageOf(wave)} • LvL ${waveInStage(wave)}/${LEVELS_PER_STAGE}`);
+    syncUI();
+  }
+
+  function onLose(){
+    // щит спасает 1 раз
+    if(buffs.shield){
+      buffs.shield=false;
+      burst(player.x, player.y-40, 60, 6.8, 210);
+      toast('Щит спас! 🛡');
+      syncUI();
+      return;
+    }
+
+    const st = stageOf(wave);
+    const backTo = stageStartWave(st);
+    pendingStartWave = backTo;
+
+    SAVE.bestWave = Math.max(SAVE.bestWave, wave);
+    save();
+
+    banner('ПРОИГРАЛ 😵');
+    confetti();
+    toast(`Откат: Stage ${st} → LvL 1`);
+
+    running=false;
+    paused=false;
+    awaitingChest=false;
+
+    setOverlayText(
+      `Проиграл. Stage ${st}`,
+      `Ты возвращаешься на 1-й уровень этапа (уровень ${backTo}). Нажми "Играть".`
+    );
+    start.style.display='flex';
+    syncUI();
+  }
+
+  function startGame(){
+    startRun(pendingStartWave || 1);
+    pendingStartWave = 1;
+    setOverlayText('Зажал → веди пальцем','Пушка стреляет сама. Этап = 5 уровней. После этапа — сундук 🎁');
+  }
+
+  btnStart.addEventListener('click', (e)=>{ e.preventDefault(); startGame(); });
+  btnStart.addEventListener('pointerup', (e)=>{ e.preventDefault(); startGame(); });
+
+  // Movement + game sim
+  function sim(dt){
+    // buff timers
+    if(buffs.frenzyT > 0){
+      buffs.frenzyT -= dt;
+      if(buffs.frenzyT <= 0){
+        buffs.frenzyT = 0;
+        toast('Френзи закончилось ⚡');
+      }
+    }
+    applyStats();
+
+    // move cannon fast follow
+    const minX = 30;
+    const maxX = W.w - 30;
+    if(player.targetX !== null){
+      const target = clamp(player.targetX, minX, maxX);
+      const follow = 0.46;
+      player.x += (target - player.x) * follow;
+    } else {
+      const dir = (right()?1:0) - (left()?1:0);
+      player.x += dir * 820 * dt;
+    }
+    player.x = clamp(player.x, minX, maxX);
+
+    // shoot
+    shoot();
+
+    // bullets
+    for(let i=bullets.length-1;i>=0;i--){
+      const b=bullets[i];
+      b.x += b.vx * dt * 60;
+      b.y += b.vy * dt;
+      if(b.y < -60){ bullets.splice(i,1); continue; }
+
+      for(let j=balls.length-1;j>=0;j--){
+        const ball=balls[j];
+        const dx = b.x - ball.x;
+        const dy = b.y - ball.y;
+        const rr = ball.r + b.r;
+        if(dx*dx + dy*dy <= rr*rr){
+          ball.hp -= b.dmg;
+          burst(b.x,b.y, b.crit?18:10, b.crit?6.8:4.6, b.crit?55:200);
+          bullets.splice(i,1);
+
+          if(ball.hp <= 0){
+            balls.splice(j,1);
+            splitAndLoot(ball);
+            burst(ball.x, ball.y, 42, 7.2, ball.boss?290:55);
+          }
+          break;
+        }
+      }
+    }
+
+    // balls physics
+    const g = 980;
+    const floor = W.h-90;
+    for(const ball of balls){
+      ball.vy += g * dt * 0.001;
+      ball.x += ball.vx * dt * 120;
+      ball.y += ball.vy * dt * 120;
+
+      if(ball.x-ball.r < 0){ ball.x=ball.r; ball.vx*=-0.95; }
+      if(ball.x+ball.r > W.w){ ball.x=W.w-ball.r; ball.vx*=-0.95; }
+
+      if(ball.y+ball.r > floor){
+        ball.y = floor - ball.r;
+        ball.vy *= -0.78;
+        if(Math.abs(ball.vy) < 0.9) ball.vy = -rand(1.2, 2.0);
+        ball.vx += rand(-0.08, 0.08);
+        ball.vx = clamp(ball.vx, -1.8, 1.8);
+      }
+
+      // collision with player = lose
+      const cx = player.x, cy = player.y - 20;
+      const dx = ball.x - cx, dy = ball.y - cy;
+      const rr = ball.r + 22;
+      if(dx*dx + dy*dy < rr*rr){
+        onLose();
+        return;
+      }
+    }
+
+    // LOOT physics (fast fall, stays on ground)
+    const px = player.x, py = player.y-30;
+    const magR = ST.magnet;
+
+    function stepDrop(arr, onPickup){
+      const lootG = 1600;
+      const bounce = 0.35;
+      const floorFriction = 0.82;
+
+      for(let i=arr.length-1;i>=0;i--){
+        const l=arr[i];
+
+        // magnet: coins only + also pulls powerups lightly
+        const wantsMag = (l.type==='coin') || (l.type==='shield') || (l.type==='frenzy');
+        if(magR > 0 && wantsMag){
+          const dx = px - l.x, dy = py - l.y;
+          const d2 = dx*dx + dy*dy;
+          const mr = (l.type==='coin') ? magR : magR*0.55;
+          if(d2 < mr*mr){
+            l.vx += dx * 0.020 * (dt*60);
+            l.vy += dy * 0.020 * (dt*60);
+          }
+        }
+
+        if(!l.grounded) l.vy += lootG * dt;
+        l.x += l.vx * dt;
+        l.y += l.vy * dt;
+
+        if(l.x - l.r < 0){ l.x = l.r; l.vx *= -0.45; }
+        if(l.x + l.r > W.w){ l.x = W.w - l.r; l.vx *= -0.45; }
+
+        if(l.y + l.r >= floor){
+          l.y = floor - l.r;
+          if(Math.abs(l.vy) > 120){
+            l.vy *= -bounce;
+            l.vx *= 0.88;
+            l.grounded = false;
+          } else {
+            l.vy = 0;
+            l.grounded = true;
+            l.vx *= floorFriction;
+            if(Math.abs(l.vx) < 8) l.vx = 0;
+          }
+        }
+
+        const dxp = px - l.x, dyp = py - l.y;
+        if(dxp*dxp + dyp*dyp < 28*28){
+          onPickup(l);
+          arr.splice(i,1);
+        }
+      }
+    }
+
+    stepDrop(loot, (l)=>{
+      if(l.type==='coin'){
+        SAVE.coins += Math.max(1, Math.floor(1 * ST.coinMult));
+        burst(l.x,l.y, 10, 4.0, 55);
+      } else {
+        SAVE.gems += 1;
+        burst(l.x,l.y, 14, 4.6, 290);
+      }
+    });
+
+    stepDrop(powerups, (p)=>{
+      if(p.type==='shield'){
+        buffs.shield=true;
+        burst(p.x,p.y, 30, 6.0, 210);
+        toast('Подобран щит 🛡 (1 раз спасёт)');
+      } else {
+        buffs.frenzyT = Math.max(buffs.frenzyT, 8.0);
+        burst(p.x,p.y, 40, 6.8, 50);
+        toast('Френзи ⚡ (скорострельность x2)');
+      }
+    });
+
+    // clear wave
+    if(balls.length===0){
+      const prevWave = wave;
+      const prevStage = stageOf(prevWave);
+      const prevIn = waveInStage(prevWave);
+
+      // best
+      SAVE.bestWave = Math.max(SAVE.bestWave, prevWave);
+      save();
+
+      // stage completed?
+      if(prevIn === LEVELS_PER_STAGE){
+        // пауза, сундук, затем следующий stage level1
+        nextWaveAfterChest = prevWave + 1;
+        openStageChest(prevStage);
+        banner(`ЭТАП ${prevStage} ПРОЙДЕН!`);
+        confetti();
+        syncUI();
+        return;
+      }
+
+      // normal next wave
+      wave++;
+      const st = stageOf(wave);
+      const wIn = waveInStage(wave);
+
+      if(wIn === 1){
+        banner(`ЭТАП ${st}!`);
+        confetti();
+        toast(`Новый этап: ${st}`);
+      } else {
+        banner(`УРОВЕНЬ ${wIn}/${LEVELS_PER_STAGE}`);
+        toast(`Уровень ${wIn}/${LEVELS_PER_STAGE}`);
+      }
+
+      spawnWave(wave);
+    }
+
+    save();
+    syncUI();
+  }
+
+  // Draw helpers
+  function roundRect(x,y,w,h,r){
+    r=Math.min(r,w/2,h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  // Draw
+  let time=0;
+  function draw(){
+    resize();
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+
+    drawBG(time);
+
+    // balls
+    for(const ball of balls){
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,.20)';
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = ball.boss ? 'rgba(142,91,255,.95)' : 'rgba(255,255,255,.95)';
+      ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = ball.boss ? 'rgba(92,31,180,.75)' : 'rgba(0,0,0,.12)';
+      ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.stroke();
+
+      ctx.fillStyle = 'rgba(0,0,0,.85)';
+      ctx.font = `${Math.max(14, Math.floor(ball.r*0.60))}px system-ui`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(Math.max(1, Math.floor(ball.hp)), ball.x, ball.y);
+
+      if(ball.boss){
+        ctx.font = `${Math.max(18, Math.floor(ball.r*0.45))}px system-ui`;
+        ctx.fillText('👑', ball.x, ball.y - ball.r*0.78);
+      }
+    }
+
+    // bullets
+    for(const b of bullets){
+      ctx.save();
+      ctx.fillStyle = b.crit ? 'rgba(255,196,58,.95)' : 'rgba(46,196,255,.95)';
+      ctx.shadowColor = b.crit ? 'rgba(255,196,58,.55)' : 'rgba(46,196,255,.55)';
+      ctx.shadowBlur=12;
+      ctx.beginPath(); ctx.arc(b.x,b.y,b.crit?4.0:3.2,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+
+    // loot
+    for(const l of loot){
+      ctx.save();
+      if(l.type==='coin'){
+        ctx.fillStyle='rgba(255,196,58,.95)';
+        ctx.shadowColor='rgba(255,196,58,.55)';
+        ctx.shadowBlur=12;
+        ctx.beginPath(); ctx.arc(l.x,l.y,l.r,0,Math.PI*2); ctx.fill();
+      } else {
+        ctx.fillStyle='rgba(142,91,255,.95)';
+        ctx.shadowColor='rgba(142,91,255,.55)';
+        ctx.shadowBlur=14;
+        ctx.beginPath();
+        ctx.moveTo(l.x, l.y-l.r);
+        ctx.lineTo(l.x+l.r, l.y);
+        ctx.lineTo(l.x, l.y+l.r);
+        ctx.lineTo(l.x-l.r, l.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // powerups
+    for(const p of powerups){
+      ctx.save();
+      if(p.type==='shield'){
+        ctx.fillStyle='rgba(46,196,255,.95)';
+        ctx.shadowColor='rgba(46,196,255,.55)';
+        ctx.shadowBlur=14;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,.95)';
+        ctx.font='900 14px system-ui';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText('🛡', p.x, p.y+1);
+      } else {
+        ctx.fillStyle='rgba(255,196,58,.95)';
+        ctx.shadowColor='rgba(255,196,58,.55)';
+        ctx.shadowBlur=14;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='rgba(0,0,0,.75)';
+        ctx.font='900 14px system-ui';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText('⚡', p.x, p.y+1);
+      }
+      ctx.restore();
+    }
+
+    drawParticles();
+
+    // cannon
+    const x=player.x, y=player.y;
+    ctx.save();
+    ctx.shadowColor='rgba(0,0,0,.25)';
+    ctx.shadowBlur=14;
+
+    // shield glow around cannon
+    if(buffs.shield){
+      ctx.save();
+      ctx.globalAlpha=0.40;
+      ctx.strokeStyle='rgba(46,196,255,.95)';
+      ctx.lineWidth=4;
+      ctx.beginPath(); ctx.arc(x, y-18, 34, 0, Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
+
+    for(const s of [-1,1]){
+      ctx.fillStyle='rgba(0,0,0,.20)';
+      ctx.beginPath(); ctx.arc(x + s*18, y+14, 12, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.75)';
+      ctx.beginPath(); ctx.arc(x + s*18, y+14, 6, 0, Math.PI*2); ctx.fill();
+    }
+
+    ctx.fillStyle='rgba(60,60,60,.90)';
+    roundRect(x-34, y-6, 68, 18, 10); ctx.fill();
+
+    ctx.fillStyle='#3A86FF';
+    roundRect(x-16, y-40, 32, 32, 12); ctx.fill();
+
+    ctx.fillStyle='#1F5FB8';
+    roundRect(x-6, y-58, 12, 24, 8); ctx.fill();
+
+    ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(255,255,255,.95)';
+    ctx.font='900 12px system-ui';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(`x${ST.cannons}`, x, y-44);
+
+    ctx.restore();
+  }
+
+  // Loop
+  let last=now();
+  function loop(){
+    const t=now();
+    const dt=clamp((t-last)/1000, 0.008, 0.050);
+    last=t;
+    time += dt*1000;
+
+    const anyModalOpen =
+      mShop.classList.contains('on') ||
+      mPets.classList.contains('on') ||
+      mAdmin.classList.contains('on') ||
+      mChest.classList.contains('on');
+
+    if(running && !paused && !anyModalOpen && !awaitingChest){
+      sim(dt);
+    }
+
+    stepParticles(dt*60);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // UI open/close
+  btnShop.addEventListener('click', ()=>{
+    if(!running || awaitingChest) return;
+    paused=true;
+    mShop.classList.add('on');
+    renderShop();
+  });
+  closeShop.addEventListener('click', ()=>{ mShop.classList.remove('on'); paused=false; });
+  mShop.addEventListener('click', (e)=>{ if(e.target===mShop){ mShop.classList.remove('on'); paused=false; } });
+
+  btnPets.addEventListener('click', ()=>{
+    if(!running || awaitingChest) return;
+    paused=true;
+    mPets.classList.add('on');
+    tabSpin.classList.add('on'); tabInv.classList.remove('on');
+    spinPanel.style.display='block'; invPanel.style.display='none';
+    renderInv();
+    syncUI();
+  });
+  closePets.addEventListener('click', ()=>{ mPets.classList.remove('on'); paused=false; });
+  mPets.addEventListener('click', (e)=>{ if(e.target===mPets){ mPets.classList.remove('on'); paused=false; } });
+
+  tabSpin.addEventListener('click', ()=>{
+    tabSpin.classList.add('on'); tabInv.classList.remove('on');
+    spinPanel.style.display='block'; invPanel.style.display='none';
+  });
+  tabInv.addEventListener('click', ()=>{
+    tabInv.classList.add('on'); tabSpin.classList.remove('on');
+    invPanel.style.display='block'; spinPanel.style.display='none';
+    renderInv();
+  });
+
+  spin1.addEventListener('click', ()=>spin(25, 1));
+  spin10.addEventListener('click', ()=>spin(220, 10));
+
+  btnPause.addEventListener('click', ()=>{
+    if(!running || awaitingChest) return;
+    paused=!paused;
+    toast(paused?'Пауза':'Продолжить');
+  });
+
+  // Start overlay tap = start
+  start.addEventListener('click', (e)=>{
+    if(e.target === btnReset) return;
+    if(start.style.display !== 'none') startGame();
+  }, {passive:true});
+
+  // Start / reset
+  btnStart.addEventListener('click', (e)=>{ e.preventDefault(); startGame(); });
+  btnStart.addEventListener('pointerup', (e)=>{ e.preventDefault(); startGame(); });
+  btnReset.addEventListener('click', ()=>hardReset());
+
+  // Start game function
+  function startGame(){
+    startRun(pendingStartWave || 1);
+    pendingStartWave = 1;
+    setOverlayText('Зажал → веди пальцем','Пушка стреляет сама. Этап = 5 уровней. После этапа — сундук 🎁');
+  }
+
+  // Init
+  applyStats();
+  syncUI();
+  toast('Нажми Играть');
+  loop();
+
+})();
+</script>
+</body>
+  </html>
