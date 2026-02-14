@@ -1,1 +1,16 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #87CEFA;
+  touch-action: none;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
 
+canvas {
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  touch-action: none;
+}
