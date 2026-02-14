@@ -3,11 +3,138 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Ball Blast — Cannon Demo</title>
+  <title>VOIDRUN: Survivor Arena</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <canvas id="game"></canvas>
+
+  <!-- UI -->
+  <div id="ui">
+    <!-- Top HUD -->
+    <div id="hudTop" class="glass hidden">
+      <div class="hudRow">
+        <div class="pill" id="hudStage">Этап 1 · Уровень 1/5</div>
+        <div class="pill" id="hudMode">Карта: Бесконечная</div>
+      </div>
+      <div class="hudRow">
+        <div class="pill" id="hudHP">❤ 100 / 100</div>
+        <div class="pill" id="hudXP">XP 0 / 10</div>
+        <div class="pill" id="hudCoins">🪙 0</div>
+        <div class="pill" id="hudGems">💎 0</div>
+      </div>
+      <div class="hudRow">
+        <div class="pill" id="hudTime">⏱ 00:00</div>
+        <div class="pill" id="hudKills">☠ 0</div>
+        <button class="btn small" id="btnPause">Пауза</button>
+      </div>
+    </div>
+
+    <!-- Joystick -->
+    <div id="joyWrap" class="hidden">
+      <div id="joyBase">
+        <div id="joyKnob"></div>
+      </div>
+    </div>
+
+    <!-- Bottom dock (in-game quick) -->
+    <div id="dock" class="glass hidden">
+      <button class="dockBtn" id="dockShop">🛒</button>
+      <button class="dockBtn" id="dockLoadout">🎽</button>
+      <button class="dockBtn" id="dockSkills">✨</button>
+      <button class="dockBtn" id="dockQuit">⏏</button>
+    </div>
+
+    <!-- Screens -->
+    <div id="screenMenu" class="screen">
+      <div class="panel glass">
+        <div class="title">VOIDRUN</div>
+        <div class="subtitle">Survivor Arena</div>
+
+        <div class="menuStats">
+          <div class="pill" id="menuCoins">🪙 0</div>
+          <div class="pill" id="menuGems">💎 0</div>
+          <div class="pill" id="menuProgress">Прогресс: Этап 1 · Уровень 1/5</div>
+        </div>
+
+        <div class="menuBtns">
+          <button class="btn primary" id="btnPlay">Играть</button>
+          <button class="btn" id="btnShop">Магазин</button>
+          <button class="btn" id="btnLoadout">Персонализация</button>
+          <button class="btn" id="btnReset">Сброс прогресса</button>
+        </div>
+
+        <div class="hint">
+          Управление: левый джойстик. Герой стреляет сам. За XP выбираешь 1 из 3 навыков.
+          Навыки сбрасываются после уровня, а покупки в магазине остаются.
+        </div>
+      </div>
+    </div>
+
+    <div id="screenPause" class="screen hidden">
+      <div class="panel glass">
+        <div class="title small">Пауза</div>
+        <div class="menuBtns">
+          <button class="btn primary" id="btnResume">Продолжить</button>
+          <button class="btn" id="btnToMenu">В меню</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="screenLevelUp" class="screen hidden">
+      <div class="panel glass wide">
+        <div class="title small">Выбери улучшение</div>
+        <div class="subtitle small">1 из 3 · уровень навыка в забеге</div>
+        <div id="upgradeGrid" class="grid"></div>
+      </div>
+    </div>
+
+    <div id="screenShop" class="screen hidden">
+      <div class="panel glass wide">
+        <div class="shopHeader">
+          <div>
+            <div class="title small">Магазин</div>
+            <div class="subtitle small">Постоянные покупки (мета). Навыки в забеге не сохраняются.</div>
+          </div>
+          <div class="shopWallet">
+            <div class="pill" id="shopCoins">🪙 0</div>
+            <div class="pill" id="shopGems">💎 0</div>
+            <button class="btn small" id="btnCloseShop">Закрыть</button>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="meta">Прокачка</button>
+          <button class="tab" data-tab="weapons">Оружие</button>
+          <button class="tab" data-tab="cosmetics">Косметика</button>
+        </div>
+
+        <div id="shopScroll" class="shopScroll">
+          <div id="shopMeta" class="shopPage"></div>
+          <div id="shopWeapons" class="shopPage hidden"></div>
+          <div id="shopCosmetics" class="shopPage hidden"></div>
+        </div>
+
+        <div class="hint small">Листать вправо/влево можно свайпом (по карточкам).</div>
+      </div>
+    </div>
+
+    <div id="screenLoadout" class="screen hidden">
+      <div class="panel glass wide">
+        <div class="shopHeader">
+          <div>
+            <div class="title small">Персонализация</div>
+            <div class="subtitle small">Выбери цвет героя и “ауру”.</div>
+          </div>
+          <button class="btn small" id="btnCloseLoadout">Закрыть</button>
+        </div>
+        <div id="loadoutGrid" class="grid"></div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
   <script src="game.js"></script>
 </body>
 </html>
