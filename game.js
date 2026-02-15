@@ -5,7 +5,10 @@
    - Damage numbers + HP bars
    - Visible grenades + lightning + saw blades
    - Level summary modal + Stage chest modal
-   - Lots more perks (levels scale power)
+   - Shop categories (nested)
+   - Pets + pet roulette + pet buffs
+   - Boss banner top + danger flash
+   - Map flicker fix (snap background to ints)
 */
 
 const canvas = document.getElementById("game");
@@ -99,7 +102,7 @@ function showToast(txt, ms = 1200) {
   showToast._t = setTimeout(() => ui.toast.classList.add("hidden"), ms);
 }
 
-// Move joystick to RIGHT (in case CSS not updated)
+// Joystick RIGHT (in case CSS not updated)
 if (ui.joyWrap) {
   ui.joyWrap.style.left = "auto";
   ui.joyWrap.style.right = "14px";
@@ -126,7 +129,8 @@ const defaultSave = () => ({
   unlockedWeapons: ["Pistol"],
   equippedWeapon: "Pistol",
   meta: { hp: 0, dmg: 0, firerate: 0, movespeed: 0, magnet: 0 },
-  cosmetics: { owned: ["Blue"], auraOwned: ["None"], color: "Blue", aura: "None" }
+  cosmetics: { owned: ["Blue"], auraOwned: ["None"], color: "Blue", aura: "None" },
+  pets: { owned: [], equipped: "None" }
 });
 let save = loadSave();
 
@@ -135,7 +139,13 @@ function loadSave() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return defaultSave();
     const s = JSON.parse(raw);
-    return { ...defaultSave(), ...s, meta: { ...defaultSave().meta, ...(s.meta || {}) }, cosmetics: { ...defaultSave().cosmetics, ...(s.cosmetics || {}) } };
+    const d = defaultSave();
+    return {
+      ...d, ...s,
+      meta: { ...d.meta, ...(s.meta || {}) },
+      cosmetics: { ...d.cosmetics, ...(s.cosmetics || {}) },
+      pets: { ...d.pets, ...(s.pets || {}) }
+    };
   } catch {
     return defaultSave();
   }
@@ -166,18 +176,27 @@ let state = STATE.MENU;
 function setState(s) {
   state = s;
 
-  if (ui.screenMenu) ui.screenMenu.classList.toggle("hidden", s !== STATE.MENU);
-  if (ui.screenPause) ui.screenPause.classList.toggle("hidden", s !== STATE.PAUSE);
-  if (ui.screenLevelUp) ui.screenLevelUp.classList.toggle("hidden", s !== STATE.LEVELUP);
-  if (ui.screenShop) ui.screenShop.classList.toggle("hidden", s !== STATE.SHOP);
-  if (ui.screenLoadout) ui.screenLoadout.classList.toggle("hidden", s !== STATE.LOADOUT);
-  if (ui.screenSummary) ui.screenSummary.classList.toggle("hidden", s !== STATE.SUMMARY);
-  if (ui.screenChest) ui.screenChest.classList.toggle("hidden", s !== STATE.CHEST);
+  ui.screenMenu?.classList.toggle("hidden", s !== STATE.MENU);
+  ui.screenPause?.classList.toggle("hidden", s !== STATE.PAUSE);
+  ui.screenLevelUp?.classList.toggle("hidden", s !== STATE.LEVELUP);
+  ui.screenShop?.classList.toggle("hidden", s !== STATE.SHOP);
+  ui.screenLoadout?.classList.toggle("hidden", s !== STATE.LOADOUT);
+  ui.screenSummary?.classList.toggle("hidden", s !== STATE.SUMMARY);
+  ui.screenChest?.classList.toggle("hidden", s !== STATE.CHEST);
 
   const inRun = (s === STATE.RUN || s === STATE.PAUSE || s === STATE.LEVELUP || s === STATE.SUMMARY || s === STATE.CHEST);
-  if (ui.hud) ui.hud.classList.toggle("hidden", !inRun);
-  if (ui.joyWrap) ui.joyWrap.classList.toggle("hidden", !inRun);
-  if (ui.dock) ui.dock.classList.toggle("hidden", !inRun);
+  ui.hud?.classList.toggle("hidden", !inRun);
+  ui.joyWrap?.classList.toggle("hidden", !inRun);
+  ui.dock?.classList.toggle("hidden", !inRun);
+}
+
+// ===== Banner + Danger =====
+let bannerText = "";
+let bannerT = 0;
+let dangerT = 0;
+function showBanner(text, seconds = 2.5) {
+  bannerText = text;
+  bannerT = seconds;
 }
 
 // ===== World / Maps =====
@@ -189,7 +208,6 @@ const MAPS = [
 ];
 
 function mapForStage(stage) {
-  // cycle maps by stage
   return MAPS[(stage - 1) % MAPS.length];
 }
 
@@ -227,7 +245,7 @@ const enemies = [];
 const bullets = [];
 const drops = [];
 const fx = [];
-const floaters = []; // damage numbers etc
+const floaters = [];
 
 // ===== Weapons =====
 const WEAPONS = {
@@ -250,6 +268,58 @@ const AURAS = [
   { id: "Pulse", name: "Пульс", priceC: 900 },
   { id: "Halo", name: "Хало", priceG: 22 },
 ];
+
+// ===== Pets =====
+const RARITY = {
+  Common: { w: 55, col: "#9ca3af", name: "Обычный" },
+  Uncommon: { w: 25, col: "#22c55e", name: "Необычный" },
+  Rare: { w: 12, col: "#3b82f6", name: "Редкий" },
+  Legendary: { w: 6, col: "#f59e0b", name: "Легендарный" },
+  Mythic: { w: 2, col: "#a78bfa", name: "Мифический" },
+};
+
+const PETS = [
+  { id: "cat", name: "Кот", rar: "Common", coin: 0.05, dmg: 0.00 },
+  { id: "dog", name: "Пёс", rar: "Common", coin: 0.03, dmg: 0.03 },
+  { id: "owl", name: "Сова", rar: "Uncommon", coin: 0.08, dmg: 0.02 },
+  { id: "fox", name: "Лиса", rar: "Uncommon", coin: 0.05, dmg: 0.06 },
+  { id: "wolf", name: "Волк", rar: "Rare", coin: 0.06, dmg: 0.10 },
+  { id: "tiger", name: "Тигр", rar: "Legendary", coin: 0.10, dmg: 0.15 },
+  { id: "dragon", name: "Дракон", rar: "Mythic", coin: 0.15, dmg: 0.22 },
+];
+
+function ensurePetSave() {
+  if (!save.pets) save.pets = { owned: [], equipped: "None" };
+  if (!save.pets.owned) save.pets.owned = [];
+  if (!save.pets.equipped) save.pets.equipped = "None";
+}
+ensurePetSave();
+
+function petOwned(id) { return save.pets.owned.includes(id); }
+
+function rarityPick(list) {
+  let sum = 0;
+  for (const it of list) sum += (RARITY[it.rar]?.w ?? 1);
+  let r = Math.random() * sum;
+  for (const it of list) {
+    r -= (RARITY[it.rar]?.w ?? 1);
+    if (r <= 0) return it;
+  }
+  return list[list.length - 1];
+}
+
+function grantPet(p) {
+  if (!petOwned(p.id)) save.pets.owned.push(p.id);
+  if (save.pets.equipped === "None") save.pets.equipped = p.id;
+}
+
+function petBuff() {
+  ensurePetSave();
+  if (save.pets.equipped === "None") return { coin: 0, dmg: 0 };
+  const p = PETS.find(x => x.id === save.pets.equipped);
+  if (!p) return { coin: 0, dmg: 0 };
+  return { coin: p.coin, dmg: p.dmg };
+}
 
 // ===== Shop =====
 const META_ITEMS = [
@@ -283,130 +353,282 @@ function shopCard({ title, desc, badge, priceText, btnText, disabled, onClick })
   return d;
 }
 
+// nested shop view
+let shopView = "home"; // home | meta | weapons | cosmetics | pets
+function setShopView(v) {
+  shopView = v;
+  ui.shopMeta?.classList.toggle("hidden", v !== "meta");
+  ui.shopWeapons?.classList.toggle("hidden", v !== "weapons");
+  ui.shopCosmetics?.classList.toggle("hidden", v !== "cosmetics");
+  ui.shopPets?.classList.toggle("hidden", v !== "pets");
+}
+
 function renderShop() {
+  ensurePetSave();
   updateMenuWallet();
-  if (ui.shopMeta) ui.shopMeta.innerHTML = "";
-  if (ui.shopWeapons) ui.shopWeapons.innerHTML = "";
-  if (ui.shopCosmetics) ui.shopCosmetics.innerHTML = "";
 
-  META_ITEMS.forEach(it => {
-    const lv = save.meta[it.key] ?? 0;
-    const maxed = lv >= it.max;
-    const can = save.coins >= it.costC;
-    ui.shopMeta?.appendChild(shopCard({
-      title: it.name,
-      desc: `${it.desc} · LVL ${lv}/${it.max}`,
-      badge: maxed ? "MAX" : `LVL ${lv}`,
-      priceText: maxed ? "🪙 MAX" : `🪙 ${it.costC}`,
-      btnText: maxed ? "Макс" : (can ? "Купить" : "Не хватает"),
-      disabled: maxed || !can,
-      onClick: () => {
-        if (maxed || !can) return;
-        save.coins -= it.costC;
-        save.meta[it.key] = (save.meta[it.key] ?? 0) + 1;
-        writeSave();
-        renderShop();
-        showToast("Куплено ✅");
-      }
-    }));
-  });
+  // hide old tabs
+  ui.tabs?.forEach(t => t.classList.add("hidden"));
 
-  WEAPON_ITEMS.forEach(w => {
-    const owned = ownsWeapon(w.id);
-    const canPay = w.costG ? save.gems >= w.costG : save.coins >= w.costC;
-    const priceText = owned ? "Уже куплено" : (w.costG ? `💎 ${w.costG}` : `🪙 ${w.costC}`);
-    const btnText = owned ? (save.equippedWeapon === w.id ? "Выбрано" : "Выбрать") : (canPay ? "Купить" : "Не хватает");
+  // ensure shopPets container
+  if (!ui.shopPets) {
+    ui.shopPets = document.createElement("div");
+    ui.shopPets.id = "shopPets";
+    ui.shopPets.style.display = "grid";
+    ui.shopPets.style.gap = "10px";
+    ui.shopPets.style.marginTop = "10px";
+    // append to panel if possible
+    const panel = ui.screenShop?.querySelector(".panel") || ui.screenShop;
+    panel?.appendChild(ui.shopPets);
+  }
 
-    ui.shopWeapons?.appendChild(shopCard({
-      title: `Оружие: ${WEAPONS[w.id].name}`,
-      desc: w.desc,
-      badge: owned ? "Открыто" : "NEW",
-      priceText,
-      btnText,
-      disabled: (!owned && !canPay),
-      onClick: () => {
-        if (owned) {
+  // HOME menu container
+  if (!ui._shopHome) {
+    ui._shopHome = document.createElement("div");
+    ui._shopHome.style.display = "grid";
+    ui._shopHome.style.gridTemplateColumns = "1fr";
+    ui._shopHome.style.gap = "10px";
+    ui._shopHome.style.marginBottom = "12px";
+
+    const mkBtn = (title, sub, onClick) => {
+      const b = document.createElement("button");
+      b.className = "btn primary";
+      b.style.justifyContent = "space-between";
+      b.style.display = "flex";
+      b.innerHTML = `<span>${title}</span><span style="opacity:.85;font-weight:800">${sub}</span>`;
+      b.addEventListener("click", onClick);
+      return b;
+    };
+
+    const back = document.createElement("button");
+    back.className = "btn";
+    back.textContent = "← Назад к категориям";
+    back.addEventListener("click", () => { setShopView("home"); renderShop(); });
+
+    ui._shopHomeButtons = {
+      meta: mkBtn("🔧 Прокачка", "Мета-статы", () => { setShopView("meta"); renderShop(); }),
+      weapons: mkBtn("🔫 Оружие", "Пушки", () => { setShopView("weapons"); renderShop(); }),
+      cosmetics: mkBtn("🎨 Косметика", "Цвет / аура", () => { setShopView("cosmetics"); renderShop(); }),
+      pets: mkBtn("🐾 Питомцы", "Бусты", () => { setShopView("pets"); renderShop(); }),
+      back
+    };
+
+    const panel = ui.screenShop?.querySelector(".panel") || ui.screenShop;
+    panel?.prepend(ui._shopHome);
+  }
+
+  ui._shopHome.innerHTML = "";
+  if (shopView === "home") {
+    ui._shopHome.appendChild(ui._shopHomeButtons.meta);
+    ui._shopHome.appendChild(ui._shopHomeButtons.weapons);
+    ui._shopHome.appendChild(ui._shopHomeButtons.cosmetics);
+    ui._shopHome.appendChild(ui._shopHomeButtons.pets);
+  } else {
+    ui._shopHome.appendChild(ui._shopHomeButtons.back);
+  }
+
+  ui.shopMeta && (ui.shopMeta.innerHTML = "");
+  ui.shopWeapons && (ui.shopWeapons.innerHTML = "");
+  ui.shopCosmetics && (ui.shopCosmetics.innerHTML = "");
+  ui.shopPets && (ui.shopPets.innerHTML = "");
+
+  // show/hide
+  setShopView(shopView);
+
+  // META
+  if (shopView === "meta") {
+    META_ITEMS.forEach(it => {
+      const lv = save.meta[it.key] ?? 0;
+      const maxed = lv >= it.max;
+      const can = save.coins >= it.costC;
+      ui.shopMeta?.appendChild(shopCard({
+        title: it.name,
+        desc: `${it.desc} · LVL ${lv}/${it.max}`,
+        badge: maxed ? "MAX" : `LVL ${lv}`,
+        priceText: maxed ? "🪙 MAX" : `🪙 ${it.costC}`,
+        btnText: maxed ? "Макс" : (can ? "Купить" : "Не хватает"),
+        disabled: maxed || !can,
+        onClick: () => {
+          if (maxed || !can) return;
+          save.coins -= it.costC;
+          save.meta[it.key] = (save.meta[it.key] ?? 0) + 1;
+          writeSave();
+          renderShop();
+          showToast("Куплено ✅");
+        }
+      }));
+    });
+  }
+
+  // WEAPONS
+  if (shopView === "weapons") {
+    WEAPON_ITEMS.forEach(w => {
+      const owned = ownsWeapon(w.id);
+      const canPay = w.costG ? save.gems >= w.costG : save.coins >= w.costC;
+      const priceText = owned ? "Уже куплено" : (w.costG ? `💎 ${w.costG}` : `🪙 ${w.costC}`);
+      const btnText = owned ? (save.equippedWeapon === w.id ? "Выбрано" : "Выбрать") : (canPay ? "Купить" : "Не хватает");
+
+      ui.shopWeapons?.appendChild(shopCard({
+        title: `Оружие: ${WEAPONS[w.id].name}`,
+        desc: w.desc,
+        badge: owned ? "Открыто" : "NEW",
+        priceText,
+        btnText,
+        disabled: (!owned && !canPay),
+        onClick: () => {
+          if (owned) {
+            save.equippedWeapon = w.id;
+            writeSave();
+            renderShop();
+            showToast("Выбрано ✅");
+            return;
+          }
+          if (!canPay) return;
+          if (w.costG) save.gems -= w.costG; else save.coins -= w.costC;
+          save.unlockedWeapons.push(w.id);
           save.equippedWeapon = w.id;
           writeSave();
           renderShop();
-          showToast("Выбрано ✅");
-          return;
+          showToast("Оружие куплено ✅");
         }
-        if (!canPay) return;
-        if (w.costG) save.gems -= w.costG; else save.coins -= w.costC;
-        save.unlockedWeapons.push(w.id);
-        save.equippedWeapon = w.id;
-        writeSave();
-        renderShop();
-        showToast("Оружие куплено ✅");
-      }
-    }));
-  });
+      }));
+    });
+  }
 
-  COS_COLORS.forEach(c => {
-    const owned = save.cosmetics.owned.includes(c.id);
-    const can = c.priceG ? save.gems >= c.priceG : save.coins >= c.priceC;
-    const priceText = owned ? "Уже куплено" : (c.priceG ? `💎 ${c.priceG}` : `🪙 ${c.priceC}`);
-    const btnText = owned ? (save.cosmetics.color === c.id ? "Надето" : "Надеть") : (can ? "Купить" : "Не хватает");
+  // COSMETICS
+  if (shopView === "cosmetics") {
+    COS_COLORS.forEach(c => {
+      const owned = save.cosmetics.owned.includes(c.id);
+      const can = c.priceG ? save.gems >= c.priceG : save.coins >= c.priceC;
+      const priceText = owned ? "Уже куплено" : (c.priceG ? `💎 ${c.priceG}` : `🪙 ${c.priceC}`);
+      const btnText = owned ? (save.cosmetics.color === c.id ? "Надето" : "Надеть") : (can ? "Купить" : "Не хватает");
 
-    ui.shopCosmetics?.appendChild(shopCard({
-      title: `Цвет: ${c.name}`,
-      desc: `Меняет стиль героя (без статов).`,
-      badge: owned ? "OK" : "NEW",
-      priceText,
-      btnText,
-      disabled: (!owned && !can),
-      onClick: () => {
-        if (owned) {
+      ui.shopCosmetics?.appendChild(shopCard({
+        title: `Цвет: ${c.name}`,
+        desc: `Меняет стиль героя (без статов).`,
+        badge: owned ? "OK" : "NEW",
+        priceText,
+        btnText,
+        disabled: (!owned && !can),
+        onClick: () => {
+          if (owned) {
+            save.cosmetics.color = c.id;
+            writeSave(); renderShop();
+            showToast("Надето ✅");
+            return;
+          }
+          if (!can) return;
+          if (c.priceG) save.gems -= c.priceG; else save.coins -= c.priceC;
+          save.cosmetics.owned.push(c.id);
           save.cosmetics.color = c.id;
           writeSave(); renderShop();
-          showToast("Надето ✅");
-          return;
+          showToast("Куплено ✅");
         }
-        if (!can) return;
-        if (c.priceG) save.gems -= c.priceG; else save.coins -= c.priceC;
-        save.cosmetics.owned.push(c.id);
-        save.cosmetics.color = c.id;
-        writeSave(); renderShop();
-        showToast("Куплено ✅");
-      }
-    }));
-  });
+      }));
+    });
 
-  AURAS.forEach(a => {
-    const owned = save.cosmetics.auraOwned.includes(a.id);
-    const can = a.priceG ? save.gems >= a.priceG : save.coins >= a.priceC;
-    const priceText = owned ? "Уже куплено" : (a.priceG ? `💎 ${a.priceG}` : `🪙 ${a.priceC}`);
-    const btnText = owned ? (save.cosmetics.aura === a.id ? "Надето" : "Надеть") : (can ? "Купить" : "Не хватает");
+    AURAS.forEach(a => {
+      const owned = save.cosmetics.auraOwned.includes(a.id);
+      const can = a.priceG ? save.gems >= a.priceG : save.coins >= a.priceC;
+      const priceText = owned ? "Уже куплено" : (a.priceG ? `💎 ${a.priceG}` : `🪙 ${a.priceC}`);
+      const btnText = owned ? (save.cosmetics.aura === a.id ? "Надето" : "Надеть") : (can ? "Купить" : "Не хватает");
 
-    ui.shopCosmetics?.appendChild(shopCard({
-      title: `Аура: ${a.name}`,
-      desc: `Визуальный эффект вокруг героя.`,
-      badge: owned ? "OK" : "NEW",
-      priceText,
-      btnText,
-      disabled: (!owned && !can),
-      onClick: () => {
-        if (owned) {
+      ui.shopCosmetics?.appendChild(shopCard({
+        title: `Аура: ${a.name}`,
+        desc: `Визуальный эффект вокруг героя.`,
+        badge: owned ? "OK" : "NEW",
+        priceText,
+        btnText,
+        disabled: (!owned && !can),
+        onClick: () => {
+          if (owned) {
+            save.cosmetics.aura = a.id;
+            writeSave(); renderShop();
+            showToast("Надето ✅");
+            return;
+          }
+          if (!can) return;
+          if (a.priceG) save.gems -= a.priceG; else save.coins -= a.priceC;
+          save.cosmetics.auraOwned.push(a.id);
           save.cosmetics.aura = a.id;
           writeSave(); renderShop();
-          showToast("Надето ✅");
-          return;
+          showToast("Куплено ✅");
         }
-        if (!can) return;
-        if (a.priceG) save.gems -= a.priceG; else save.coins -= a.priceC;
-        save.cosmetics.auraOwned.push(a.id);
-        save.cosmetics.aura = a.id;
-        writeSave(); renderShop();
-        showToast("Куплено ✅");
+      }));
+    });
+  }
+
+  // PETS
+  if (shopView === "pets") {
+    const spinCostC = 1200;
+    const spinCostG = 6;
+
+    ui.shopPets?.appendChild(shopCard({
+      title: "🎰 Рулетка питомцев",
+      desc: `Крутка даёт питомца. Редкость случайная. (Можно получить повтор)`,
+      badge: "SPIN",
+      priceText: `🪙 ${spinCostC} или 💎 ${spinCostG}`,
+      btnText: (save.coins >= spinCostC || save.gems >= spinCostG) ? "Крутить" : "Не хватает",
+      disabled: !(save.coins >= spinCostC || save.gems >= spinCostG),
+      onClick: () => {
+        if (save.coins >= spinCostC) save.coins -= spinCostC;
+        else if (save.gems >= spinCostG) save.gems -= spinCostG;
+        else return;
+
+        const p = rarityPick(PETS);
+        grantPet(p);
+        writeSave();
+        showToast(`🐾 Выпал: ${p.name} (${RARITY[p.rar].name})`, 1600);
+        renderShop();
       }
     }));
-  });
+
+    PETS.forEach(p => {
+      const owned = petOwned(p.id);
+      const eq = save.pets.equipped === p.id;
+      const r = RARITY[p.rar];
+
+      ui.shopPets?.appendChild(shopCard({
+        title: `🐾 ${p.name}`,
+        desc: `Редкость: <span style="color:${r.col};font-weight:900">${r.name}</span> · Буст: 🪙 +${Math.floor(p.coin * 100)}% · ⚔️ +${Math.floor(p.dmg * 100)}%`,
+        badge: owned ? (eq ? "НАДЕТ" : "ЕСТЬ") : "LOCK",
+        priceText: owned ? "Уже получен" : "Только из рулетки",
+        btnText: owned ? (eq ? "Надет" : "Надеть") : "Недоступно",
+        disabled: !owned || eq,
+        onClick: () => {
+          save.pets.equipped = p.id;
+          writeSave();
+          renderShop();
+          showToast("Питомец надет ✅");
+        }
+      }));
+    });
+  }
 }
 
 function renderLoadout() {
   if (!ui.loadoutGrid) return;
   ui.loadoutGrid.innerHTML = "";
+
+  // equipped pet
+  ensurePetSave();
+  const eqPet = PETS.find(p => p.id === save.pets.equipped);
+  const petCard = document.createElement("div");
+  petCard.className = "card";
+  petCard.innerHTML = `
+    <div class="cardTitle">🐾 Питомец</div>
+    <div class="cardDesc">${eqPet ? `${eqPet.name} · 🪙 +${Math.floor(eqPet.coin * 100)}% · ⚔️ +${Math.floor(eqPet.dmg * 100)}%` : "Не выбран"}</div>
+    <div class="cardRow">
+      <div class="chip">${eqPet ? "Надет" : "Нет"}</div>
+      <button class="btn small primary">${eqPet ? "Сменить в магазине" : "Открыть в магазине"}</button>
+    </div>
+  `;
+  petCard.querySelector("button").addEventListener("click", () => {
+    shopView = "pets";
+    renderShop();
+    setState(STATE.SHOP);
+  });
+  ui.loadoutGrid.appendChild(petCard);
 
   COS_COLORS.forEach(c => {
     const owned = save.cosmetics.owned.includes(c.id);
@@ -457,13 +679,7 @@ function renderLoadout() {
 }
 
 // ===== Joystick =====
-const joy = {
-  active: false,
-  id: null,
-  baseX: 0, baseY: 0,
-  dx: 0, dy: 0,
-  mag: 0
-};
+const joy = { active: false, id: null, baseX: 0, baseY: 0, dx: 0, dy: 0, mag: 0 };
 
 function setJoyKnob(dx, dy) {
   if (!ui.joyKnob) return;
@@ -509,26 +725,9 @@ ui.joyBase?.addEventListener("pointercancel", joyEnd, { passive: false });
 // ===== Skills (levels) =====
 function initRunSkills() {
   player.run = {
-    dmgLv: 0,
-    fireLv: 0,
-    spdLv: 0,
-    hpLv: 0,
-    regenLv: 0,
-    magnetLv: 0,
-    critLv: 0,
-    vampLv: 0,      // lifesteal
-    armorLv: 0,     // reduce damage
-    // actives
-    sawLv: 0,
-    grenadeLv: 0,
-    lightningLv: 0,
-    droneLv: 0,
-    shieldLv: 0,
-    frostLv: 0,     // slow aura
-    // utility
-    pierceLv: 0,
-    multiLv: 0,
-    boomLv: 0,      // explode on hit
+    dmgLv: 0, fireLv: 0, spdLv: 0, hpLv: 0, regenLv: 0, magnetLv: 0, critLv: 0, vampLv: 0, armorLv: 0,
+    sawLv: 0, grenadeLv: 0, lightningLv: 0, droneLv: 0, shieldLv: 0, frostLv: 0,
+    pierceLv: 0, multiLv: 0, boomLv: 0,
   };
 }
 
@@ -559,7 +758,6 @@ function skillPool() {
 
 function pickUpgrades3() {
   const pool = skillPool().filter(s => s.lvl() < s.max);
-  // if all maxed, still offer some basic ones (fallback)
   if (pool.length <= 0) return [
     { id: "COIN", name: "🪙 Бонус", desc: "+монеты", lvl: () => 0, max: 999, apply: () => { player.coins += 50; } },
     { id: "HEAL", name: "❤ Хил", desc: "Восстановить HP", lvl: () => 0, max: 999, apply: () => { player.hp = Math.min(player.maxHp, player.hp + 40); } },
@@ -569,10 +767,8 @@ function pickUpgrades3() {
   const picks = [];
   while (picks.length < 3 && pool.length > 0) {
     const i = randi(0, pool.length - 1);
-    const s = pool.splice(i, 1)[0];
-    picks.push(s);
+    picks.push(pool.splice(i, 1)[0]);
   }
-  // ensure 3
   while (picks.length < 3) {
     picks.push({ id: "HEAL", name: "❤ Хил", desc: "Восстановить HP", lvl: () => 0, max: 999, apply: () => { player.hp = Math.min(player.maxHp, player.hp + 35); } });
   }
@@ -609,22 +805,9 @@ function bossTier(stage) {
 }
 
 // ===== Run flow =====
-const levelWave = {
-  t: 0,
-  spawnT: 0,
-  done: false,
-  boss: null,
-  bossSpawned: false,
-};
+const levelWave = { t: 0, spawnT: 0, done: false, boss: null, bossSpawned: false };
 
-const runSummary = {
-  xpPicked: 0,
-  coinsPicked: 0,
-  gemsPicked: 0,
-  kills: 0,
-  damage: 0,
-};
-
+const runSummary = { xpPicked: 0, coinsPicked: 0, gemsPicked: 0, kills: 0, damage: 0 };
 function resetSummary() {
   runSummary.xpPicked = 0;
   runSummary.coinsPicked = 0;
@@ -649,23 +832,19 @@ function resetLevelRuntime() {
 
   resetSummary();
 
-  // set map
   const m = mapForStage(save.stage);
   world.mapName = m.name;
   world.mapPalette = m.palette;
 
-  // arena alternation
   world.arena = (save.levelInStage % 2 === 0);
   world.arenaR = 560;
 
-  // wave reset
   levelWave.t = 0;
   levelWave.spawnT = 0;
   levelWave.done = false;
   levelWave.boss = null;
   levelWave.bossSpawned = false;
 
-  // player base stats from meta + weapon
   player.weapon = save.equippedWeapon;
   const w = WEAPONS[player.weapon];
   player.baseDmg = w.baseDmg;
@@ -679,37 +858,26 @@ function resetLevelRuntime() {
 
   initRunSkills();
 
-  // apply meta into run baseline
-  // (meta dmg/firerate/movespeed are multipliers inside compute functions)
   player.x = 0; player.y = 0;
   world.camX = 0; world.camY = 0;
+
+  bannerText = "";
+  bannerT = 0;
+  dangerT = 0;
 
   showToast(`Этап ${save.stage} · Уровень ${save.levelInStage}/5`, 1200);
 }
 
 function startGame() {
   resetLevelRuntime();
-  if (ui.pauseTitle) ui.pauseTitle.textContent = "Пауза";
+  ui.pauseTitle && (ui.pauseTitle.textContent = "Пауза");
   setState(STATE.RUN);
-}
-
-function gameOver() {
-  if (ui.pauseTitle) ui.pauseTitle.textContent = "Поражение";
-  setState(STATE.PAUSE);
-}
-
-function stageCompleted() {
-  setState(STATE.CHEST);
-  if (ui.chestHint) ui.chestHint.textContent = "Нажми на сундук, чтобы открыть";
-  if (ui.chest) {
-    ui.chest.classList.remove("opened");
-  }
 }
 
 function openSummary(win) {
   setState(STATE.SUMMARY);
-  if (ui.sumTitle) ui.sumTitle.textContent = win ? "Уровень пройден ✅" : "Поражение ❌";
-  if (ui.sumSub) ui.sumSub.textContent = `Этап ${save.stage} · Уровень ${save.levelInStage}/5`;
+  ui.sumTitle && (ui.sumTitle.textContent = win ? "Уровень пройден ✅" : "Поражение ❌");
+  ui.sumSub && (ui.sumSub.textContent = `Этап ${save.stage} · Уровень ${save.levelInStage}/5`);
 
   if (!ui.sumGrid) return;
   ui.sumGrid.innerHTML = "";
@@ -735,13 +903,13 @@ function openSummary(win) {
 }
 
 function finishLevelWin() {
-  // add run loot to save
+  // stage 5 boss banner
+  if (save.levelInStage === 5) showBanner("✅ БОСС ПОВЕРЖЕН!", 2.5);
+
   save.coins += player.coins;
   save.gems += player.gems;
-
   writeSave();
 
-  // progress
   const wasLevel5 = (save.levelInStage === 5);
 
   if (!wasLevel5) {
@@ -754,29 +922,89 @@ function finishLevelWin() {
     save.levelInStage = 1;
     writeSave();
     openSummary(true);
-    // after summary -> chest
-    // handled by btnNext
   }
 }
 
 function finishLevelLose() {
-  // add run loot anyway (like a bit), optional: only 50%
   save.coins += Math.floor(player.coins * 0.65);
   save.gems += Math.floor(player.gems * 0.65);
   writeSave();
 
-  // back to first level of stage
   save.levelInStage = 1;
   writeSave();
 
   openSummary(false);
 }
 
-// ===== Combat compute (skill levels => power) =====
+// ===== Chest Roulette =====
+let chestOpened = false;
+
+function chestRewardRoll() {
+  const roll = Math.random();
+  if (roll < 0.58) {
+    const c = randi(260, 650) + save.stage * 60;
+    return { type: "coins", label: `🪙 +${c}`, apply: () => { save.coins += c; } };
+  }
+  if (roll < 0.82) {
+    const g = randi(2, 7);
+    return { type: "gems", label: `💎 +${g}`, apply: () => { save.gems += g; } };
+  }
+  if (roll < 0.92) {
+    const keys = ["hp", "dmg", "firerate", "movespeed", "magnet"];
+    const k = keys[randi(0, keys.length - 1)];
+    return { type: "meta", label: `🔧 Мета +1 (${k})`, apply: () => { save.meta[k] = (save.meta[k] ?? 0) + 1; } };
+  }
+  const p = rarityPick(PETS);
+  return {
+    type: "pet",
+    label: `🐾 Питомец: ${p.name} (${RARITY[p.rar].name})`,
+    apply: () => { grantPet(p); }
+  };
+}
+
+function playChestRoulette(finalReward) {
+  return new Promise((resolve) => {
+    let t = 0;
+    const dur = 2.4;
+    const picks = [];
+    for (let i = 0; i < 14; i++) picks.push(chestRewardRoll().label);
+    picks[picks.length - 1] = finalReward.label;
+
+    let idx = 0;
+    function step() {
+      const dt = 1 / 60;
+      t += dt;
+      const p = clamp(t / dur, 0, 1);
+      const speed = 18 * (1 - p) + 2;
+      if (Math.random() < (speed * dt)) idx = Math.min(idx + 1, picks.length - 1);
+
+      if (ui.chestHint) ui.chestHint.textContent = `🎰 ${picks[idx]}`;
+
+      if (t >= dur) { resolve(); return; }
+      requestAnimationFrame(step);
+    }
+    step();
+  });
+}
+
+function stageCompleted() {
+  chestOpened = false;
+  ui.chestHint && (ui.chestHint.textContent = "Нажми на сундук, чтобы открыть");
+  ui.chest && ui.chest.classList.remove("opened");
+
+  if (ui.btnChestContinue) {
+    ui.btnChestContinue.disabled = true;
+    ui.btnChestContinue.textContent = "Открой сундук";
+  }
+  setState(STATE.CHEST);
+}
+
+// ===== Combat compute =====
 function dmgMultiplier() {
   const meta = 1 + (save.meta.dmg * 0.04);
   const run = 1 + (player.run.dmgLv * 0.15);
-  return meta * run;
+  const pet = 1 + petBuff().dmg;
+  return meta * run * pet;
 }
 function fireMultiplier() {
   const meta = 1 + (save.meta.firerate * 0.03);
@@ -788,15 +1016,9 @@ function speedMultiplier() {
   const run = 1 + (player.run.spdLv * 0.10);
   return meta * run;
 }
-function critChance() {
-  return clamp(player.run.critLv * 0.05, 0, 0.45);
-}
-function armorReduction() {
-  return clamp(player.run.armorLv * 0.05, 0, 0.45);
-}
-function vampPercent() {
-  return clamp(player.run.vampLv * 0.03, 0, 0.25);
-}
+function critChance() { return clamp(player.run.critLv * 0.05, 0, 0.45); }
+function armorReduction() { return clamp(player.run.armorLv * 0.05, 0, 0.45); }
+function vampPercent() { return clamp(player.run.vampLv * 0.03, 0, 0.25); }
 
 // ===== Spawning =====
 function spawnAtEdge() {
@@ -809,19 +1031,11 @@ function spawnEnemy(stage, levelInStage) {
   const p = spawnAtEdge();
   const t = enemyTier(stage, levelInStage);
   enemies.push({
-    x: p.x, y: p.y,
-    vx: 0, vy: 0,
-    hp: t.hp,
-    maxHp: t.hp,
-    sp: t.sp,
-    dmg: t.dmg,
-    r: t.r,
-    kind: t.kind,
-    col: t.col,
-    xp: t.xp,
-    face: t.face,
-    hitFlash: 0,
-    slow: 0
+    x: p.x, y: p.y, vx: 0, vy: 0,
+    hp: t.hp, maxHp: t.hp,
+    sp: t.sp, dmg: t.dmg, r: t.r,
+    kind: t.kind, col: t.col, xp: t.xp, face: t.face,
+    hitFlash: 0, slow: 0
   });
 }
 
@@ -829,20 +1043,12 @@ function spawnBoss(stage) {
   const p = spawnAtEdge();
   const b = bossTier(stage);
   const e = {
-    x: p.x, y: p.y,
-    vx: 0, vy: 0,
+    x: p.x, y: p.y, vx: 0, vy: 0,
     hp: b.hp, maxHp: b.hp,
-    sp: b.sp,
-    dmg: b.dmg,
-    r: b.r,
-    kind: "boss",
-    col: b.col,
-    xp: b.xp,
-    face: b.face,
-    ultCd: b.ultCd,
-    ultTimer: b.ultTimer,
-    hitFlash: 0,
-    slow: 0
+    sp: b.sp, dmg: b.dmg, r: b.r,
+    kind: "boss", col: b.col, xp: b.xp, face: b.face,
+    ultCd: b.ultCd, ultTimer: b.ultTimer,
+    hitFlash: 0, slow: 0
   };
   enemies.push(e);
   levelWave.boss = e;
@@ -862,15 +1068,16 @@ function doSpawn(dt) {
       const n = randi(1, 2 + Math.floor(diff / 4));
       for (let i = 0; i < n; i++) spawnEnemy(save.stage, save.levelInStage);
     }
-
-    // win condition: survive time
     const targetTime = 55 + diff * 6;
     if (levelWave.t >= targetTime) levelWave.done = true;
   } else {
     if (!levelWave.bossSpawned && levelWave.t > 6) {
       levelWave.bossSpawned = true;
       spawnBoss(save.stage);
-      showToast("БОСС 😈", 1200);
+
+      // TOP banner + danger flash
+      showBanner("⚠️ БОСС ВЫШЕЛ НА АРЕНУ ⚠️", 3.0);
+      dangerT = 10.0;
     }
     if (levelWave.spawnT <= 0) {
       levelWave.spawnT = clamp(spawnInterval * 0.85, 0.18, 0.8);
@@ -933,8 +1140,10 @@ function pickupDrops(dt) {
           openLevelUp();
         }
       } else if (d.type === "coin") {
-        player.coins += d.val;
-        runSummary.coinsPicked += d.val;
+        const mult = 1 + petBuff().coin;
+        const add = Math.max(1, Math.floor(d.val * mult));
+        player.coins += add;
+        runSummary.coinsPicked += add;
       } else if (d.type === "gem") {
         player.gems += d.val;
         runSummary.gemsPicked += d.val;
@@ -964,13 +1173,10 @@ function spawnBullet(x, y, dirx, diry, dmg, speed, pierce, col, rad = 3.2) {
 }
 
 function applyExplosion(x, y, r, dmg) {
-  const r2 = r * r;
   for (const e of enemies) {
     if (e.hp <= 0) continue;
     const rr = (r + e.r);
-    if (dist2(x, y, e.x, e.y) < rr * rr) {
-      dealDamage(e, dmg, true);
-    }
+    if (dist2(x, y, e.x, e.y) < rr * rr) dealDamage(e, dmg, true);
   }
   fx.push({ type: "boom", x, y, t: 0.22, r, col: "#f59e0b" });
 }
@@ -980,7 +1186,6 @@ function dealDamage(e, dmg, isAoE = false) {
 
   e.hitFlash = 0.10;
 
-  // crit
   let final = dmg;
   let crit = false;
   if (!isAoE && Math.random() < critChance()) {
@@ -994,10 +1199,9 @@ function dealDamage(e, dmg, isAoE = false) {
 
   spawnFloater(e.x, e.y - e.r - 8, `${Math.floor(final)}`, crit ? "#fbbf24" : "#ffffff", crit);
 
-  // vamp
   const vamp = vampPercent();
   if (vamp > 0) {
-    const heal = final * vamp * 0.20; // softer so not broken
+    const heal = final * vamp * 0.20;
     player.hp = Math.min(player.maxHp, player.hp + heal);
   }
 
@@ -1032,7 +1236,7 @@ function autoShoot(dt) {
   const nx = dx / d, ny = dy / d;
 
   const addMulti = player.run.multiLv;
-  const bulletsN = w.bullets + addMulti; // big effect
+  const bulletsN = w.bullets + addMulti;
   const baseAng = Math.atan2(ny, nx);
   const spread = w.spread + addMulti * 0.05;
 
@@ -1059,14 +1263,12 @@ function updateBullets(dt) {
       if (dd > world.arenaR + 150) { bullets.splice(i, 1); continue; }
     }
 
-    // collisions
     for (const e of enemies) {
       if (e.hp <= 0) continue;
       const rr = e.r + b.r;
       if (dist2(b.x, b.y, e.x, e.y) < rr * rr) {
         dealDamage(e, b.dmg, false);
 
-        // boom perk
         if (player.run.boomLv > 0) {
           const r = 38 + player.run.boomLv * 6;
           const dmg = b.dmg * (0.35 + player.run.boomLv * 0.06);
@@ -1083,7 +1285,7 @@ function updateBullets(dt) {
   }
 }
 
-// ===== Actives visuals: saw / grenade / lightning / frost / drone =====
+// ===== Actives =====
 function sawUpdate(dt) {
   const lv = player.run.sawLv;
   if (lv <= 0) return;
@@ -1098,16 +1300,12 @@ function sawUpdate(dt) {
     const sx = player.x + Math.cos(a) * radius;
     const sy = player.y + Math.sin(a) * radius;
 
-    // damage by proximity
     for (const e of enemies) {
       if (e.hp <= 0) continue;
       const rr = e.r + 12;
-      if (dist2(sx, sy, e.x, e.y) < rr * rr) {
-        dealDamage(e, dmg * dt, true);
-      }
+      if (dist2(sx, sy, e.x, e.y) < rr * rr) dealDamage(e, dmg * dt, true);
     }
 
-    // draw saw as fx marker
     fx.push({ type: "saw", x: sx, y: sy, t: 0.02, r: 11, spin: runTime * 9 + i, col: "#e5e7eb" });
   }
 }
@@ -1172,7 +1370,6 @@ function droneUpdate(dt) {
   const dmg = (6 + lv * 3.2) * dmgMultiplier();
   spawnBullet(player.x, player.y, nx, ny, dmg, 820, 0, "#2563eb", 2.8);
 
-  // tiny drone pulse marker
   fx.push({ type: "drone", x: player.x + nx * 18, y: player.y + ny * 18, t: 0.12, col: "#60a5fa" });
 }
 
@@ -1208,7 +1405,6 @@ function frostUpdate(dt) {
 function damagePlayer(amount) {
   if (amount <= 0) return;
 
-  // armor
   amount *= (1 - armorReduction());
 
   if (player.run.shieldLv > 0 && shieldReady) {
@@ -1233,16 +1429,13 @@ function updateEnemies(dt) {
   for (const e of enemies) {
     if (e.hp <= 0) continue;
 
-    // decay slow
     e.slow *= Math.pow(0.10, dt);
     const slowMul = 1 - clamp(e.slow, 0, 0.75);
 
-    // boss ult
     if (e.kind === "boss") {
       e.ultTimer -= dt;
       if (e.ultTimer <= 0) {
         e.ultTimer = e.ultCd;
-        // ult: spawn extra enemies around player
         const n = randi(4, 7);
         for (let i = 0; i < n; i++) spawnEnemy(save.stage, 4);
         fx.push({ type: "bossUlt", x: e.x, y: e.y, t: 0.45, col: "#ef4444" });
@@ -1263,24 +1456,18 @@ function updateEnemies(dt) {
       }
     }
 
-    // collision damage
     const rr = player.r + e.r;
-    if (dist2(player.x, player.y, e.x, e.y) < rr * rr) {
-      damagePlayer(e.dmg * dt);
-    }
+    if (dist2(player.x, player.y, e.x, e.y) < rr * rr) damagePlayer(e.dmg * dt);
 
     e.hitFlash = Math.max(0, e.hitFlash - dt);
   }
 }
 
 function cleanupDeadEnemies() {
-  for (let i = enemies.length - 1; i >= 0; i--) {
-    if (enemies[i].hp > 0) continue;
-    enemies.splice(i, 1);
-  }
+  for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].hp <= 0) enemies.splice(i, 1);
 }
 
-// ===== FX update (grenade explode, etc) =====
+// ===== FX update =====
 function updateFx(dt) {
   for (let i = fx.length - 1; i >= 0; i--) {
     const f = fx[i];
@@ -1288,7 +1475,6 @@ function updateFx(dt) {
     if (f.type === "grenade") {
       f.t -= dt;
       if (f.t <= 0) {
-        // explode
         applyExplosion(f.x, f.y, f.r, f.dmg);
         fx.splice(i, 1);
       }
@@ -1318,8 +1504,8 @@ function openLevelUp() {
   pendingUpgrades = pickUpgrades3();
 
   if (!ui.upgradeGrid) return;
-
   ui.upgradeGrid.innerHTML = "";
+
   pendingUpgrades.forEach(u => {
     const lv = u.lvl();
     const d = document.createElement("div");
@@ -1364,7 +1550,6 @@ function updatePlayer(dt) {
   world.camX = player.x;
   world.camY = player.y;
 
-  // regen
   if (player.run.regenLv > 0) {
     const regen = (0.35 + player.run.regenLv * 0.18) * dt;
     player.hp = Math.min(player.maxHp, player.hp + regen);
@@ -1386,41 +1571,46 @@ function drawHPBarAt(sx, sy, w, h, p, colFill) {
   ctx.fillRect(sx - w / 2, sy, w * clamp(p, 0, 1), h);
 }
 
+// ===== Background (FIXED flicker) =====
 function drawMapBackground() {
   const p = world.mapPalette;
-  // grass base
+
   ctx.fillStyle = p.grass;
   ctx.fillRect(0, 0, W, H);
 
-  // tile-ish noise
-  const tile = 80;
-  const ox = ((-world.camX) % tile + tile) % tile;
-  const oy = ((-world.camY) % tile + tile) % tile;
+  // FIX: snap camera for background math
+  const camX = Math.floor(world.camX);
+  const camY = Math.floor(world.camY);
 
-  ctx.globalAlpha = 0.22;
+  const tile = 80;
+  const ox = ((-camX) % tile + tile) % tile;
+  const oy = ((-camY) % tile + tile) % tile;
+
+  ctx.globalAlpha = 0.18;
   ctx.fillStyle = p.grass2;
   for (let x = ox - tile; x <= W + tile; x += tile) {
     for (let y = oy - tile; y <= H + tile; y += tile) {
-      if (((x / tile + y / tile) | 0) % 2 === 0) {
-        ctx.fillRect(x, y, tile, tile);
-      }
+      const ix = Math.floor((x - ox) / tile);
+      const iy = Math.floor((y - oy) / tile);
+      if (((ix + iy) & 1) === 0) ctx.fillRect(x, y, tile, tile);
     }
   }
   ctx.globalAlpha = 1;
 
-  // dirt path bands
-  ctx.globalAlpha = 0.18;
+  ctx.globalAlpha = 0.16;
   ctx.fillStyle = p.path;
+  const bandH = 34;
+  const step = 140;
+  const shift = (camY >> 1) % step;
   for (let i = 0; i < 8; i++) {
-    const y = ((i * 140 + (world.camY * 0.25)) % (H + 200)) - 100;
-    ctx.fillRect(0, y, W, 34);
+    const y = ((i * step + shift) % (H + 200)) - 100;
+    ctx.fillRect(0, y, W, bandH);
   }
   ctx.globalAlpha = 1;
 
-  // arena ring
   if (world.arena) {
-    const dx = -world.camX;
-    const dy = -world.camY;
+    const dx = -camX;
+    const dy = -camY;
     ctx.save();
     ctx.translate(W / 2 + dx, H / 2 + dy);
     ctx.strokeStyle = "rgba(0,0,0,.20)";
@@ -1432,7 +1622,7 @@ function drawMapBackground() {
   }
 }
 
-// ===== Sprite-like drawings (no images) =====
+// ===== Sprite-like drawings =====
 function heroColor() {
   return (COS_COLORS.find(c => c.id === save.cosmetics.color)?.col) || "#2563eb";
 }
@@ -1442,13 +1632,11 @@ function drawHero() {
   const col = heroColor();
   const aura = save.cosmetics.aura || "None";
 
-  // shadow
   ctx.fillStyle = world.mapPalette.shadow;
   ctx.beginPath();
   ctx.ellipse(sx, sy + 18, 18, 8, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // aura
   if (aura === "Pulse") {
     ctx.save();
     ctx.globalAlpha = 0.25;
@@ -1469,40 +1657,33 @@ function drawHero() {
     ctx.restore();
   }
 
-  // body (hoodie-ish)
   ctx.fillStyle = col;
   ctx.beginPath();
   ctx.roundRect(sx - 14, sy - 18, 28, 32, 10);
   ctx.fill();
 
-  // head
   ctx.fillStyle = "#e5e7eb";
   ctx.beginPath();
   ctx.arc(sx, sy - 26, 10, 0, Math.PI * 2);
   ctx.fill();
 
-  // eyes (red)
   ctx.fillStyle = "#ef4444";
   ctx.fillRect(sx - 6, sy - 28, 3, 2);
   ctx.fillRect(sx + 3, sy - 28, 3, 2);
 
-  // pants
   ctx.fillStyle = "#111827";
   ctx.fillRect(sx - 13, sy + 10, 10, 12);
   ctx.fillRect(sx + 3, sy + 10, 10, 12);
 
-  // stripes adidas
   ctx.fillStyle = "rgba(255,255,255,.65)";
   ctx.fillRect(sx - 12, sy + 12, 1, 10);
   ctx.fillRect(sx - 9, sy + 12, 1, 10);
   ctx.fillRect(sx - 6, sy + 12, 1, 10);
 
-  // arms
   ctx.fillStyle = col;
   ctx.fillRect(sx - 22, sy - 8, 8, 14);
   ctx.fillRect(sx + 14, sy - 8, 8, 14);
 
-  // gun direction
   const t = nearestEnemy();
   let ang = 0;
   if (t) ang = Math.atan2(t.y - player.y, t.x - player.x);
@@ -1512,7 +1693,6 @@ function drawHero() {
   ctx.save();
   ctx.translate(gx, gy);
   ctx.rotate(ang);
-  // weapon
   ctx.fillStyle = "#0b1022";
   ctx.beginPath();
   ctx.roundRect(-4, -3, 18, 6, 3);
@@ -1521,41 +1701,47 @@ function drawHero() {
   ctx.fillRect(8, -2, 6, 1);
   ctx.restore();
 
-  // player HP bar over head
   const hpP = player.hp / player.maxHp;
   drawHPBarAt(sx, sy - 48, 56, 7, hpP, hpP > 0.35 ? "#22c55e" : "#ef4444");
+
+  // show pet as tiny dot
+  const eqPet = PETS.find(p => p.id === save.pets.equipped);
+  if (eqPet) {
+    const r = RARITY[eqPet.rar];
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = r.col;
+    ctx.beginPath();
+    ctx.arc(sx + 18, sy - 26, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawEnemy(e) {
   const { sx, sy } = worldToScreen(e.x, e.y);
   const flash = e.hitFlash > 0 ? 0.6 : 0;
 
-  // shadow
   ctx.fillStyle = world.mapPalette.shadow;
   ctx.beginPath();
   ctx.ellipse(sx, sy + e.r + 8, e.r * 0.9, e.r * 0.35, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // body
   ctx.fillStyle = flash ? "#ffffff" : e.col;
   ctx.beginPath();
   ctx.roundRect(sx - e.r, sy - e.r, e.r * 2, e.r * 2, 10);
   ctx.fill();
 
-  // face
   ctx.fillStyle = "#111827";
   if (e.kind === "boss") {
     ctx.fillRect(sx - 12, sy - 10, 24, 6);
     ctx.fillRect(sx - 10, sy + 2, 20, 5);
   } else {
-    // eyes
     ctx.fillRect(sx - 7, sy - 6, 3, 2);
     ctx.fillRect(sx + 4, sy - 6, 3, 2);
-    // mouth
     ctx.fillRect(sx - 5, sy + 4, 10, 2);
   }
 
-  // baton for police vibe (still abstract)
   ctx.fillStyle = "#111827";
   ctx.save();
   ctx.translate(sx + e.r - 6, sy + 2);
@@ -1563,11 +1749,9 @@ function drawEnemy(e) {
   ctx.fillRect(-2, -10, 4, 22);
   ctx.restore();
 
-  // hp bar
   const p = e.hp / e.maxHp;
   drawHPBarAt(sx, sy - e.r - 14, 56, 6, p, e.kind === "boss" ? "#ef4444" : "#22c55e");
 
-  // slow indicator
   if (e.slow > 0.12) {
     ctx.save();
     ctx.globalAlpha = clamp(e.slow, 0.15, 0.6);
@@ -1594,7 +1778,6 @@ function drawDrop(d) {
   ctx.beginPath();
   ctx.arc(sx, sy, d.r, 0, Math.PI * 2);
   ctx.fill();
-  // icon-ish
   ctx.fillStyle = "rgba(0,0,0,.35)";
   if (d.type === "coin") ctx.fillRect(sx - 2, sy - 4, 4, 8);
   if (d.type === "gem") ctx.fillRect(sx - 3, sy - 3, 6, 6);
@@ -1605,16 +1788,15 @@ function drawSawFx(f) {
   const { sx, sy } = worldToScreen(f.x, f.y);
   const r = f.r;
 
-  // metal disk
   ctx.save();
   ctx.translate(sx, sy);
   ctx.rotate(f.spin);
+
   ctx.fillStyle = "#e5e7eb";
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
 
-  // teeth
   ctx.fillStyle = "#9ca3af";
   for (let i = 0; i < 10; i++) {
     ctx.rotate((Math.PI * 2) / 10);
@@ -1626,7 +1808,6 @@ function drawSawFx(f) {
     ctx.fill();
   }
 
-  // center
   ctx.fillStyle = "#6b7280";
   ctx.beginPath();
   ctx.arc(0, 0, r * 0.25, 0, Math.PI * 2);
@@ -1666,7 +1847,6 @@ function drawFx() {
       ctx.strokeStyle = f.col;
       ctx.lineWidth = 3;
 
-      // jagged lightning
       ctx.beginPath();
       ctx.moveTo(x0, y0);
       const seg = 5;
@@ -1718,7 +1898,6 @@ function drawFx() {
     } else if (f.type === "saw") {
       drawSawFx(f);
     } else if (f.type === "grenade") {
-      // show grenade target
       const { sx, sy } = worldToScreen(f.x, f.y);
       ctx.save();
       ctx.globalAlpha = 0.9;
@@ -1727,13 +1906,11 @@ function drawFx() {
       ctx.arc(sx, sy, 7, 0, Math.PI * 2);
       ctx.fill();
 
-      // fuse spark
       ctx.fillStyle = "#f59e0b";
       ctx.beginPath();
       ctx.arc(sx + 6, sy - 6, 3, 0, Math.PI * 2);
       ctx.fill();
 
-      // countdown ring
       const p = clamp(f.t / 0.60, 0, 1);
       ctx.globalAlpha = 0.55;
       ctx.strokeStyle = "#f59e0b";
@@ -1742,19 +1919,16 @@ function drawFx() {
       ctx.arc(sx, sy, 16, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2) * p);
       ctx.stroke();
 
-      // radius hint
       ctx.globalAlpha = 0.10;
       ctx.strokeStyle = "#f59e0b";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(sx, sy, f.r, 0, Math.PI * 2);
       ctx.stroke();
-
       ctx.restore();
     }
   }
 
-  // frost aura ring
   if (player.run.frostLv > 0) {
     const { sx, sy } = worldToScreen(player.x, player.y);
     const r = 110 + player.run.frostLv * 12;
@@ -1782,7 +1956,7 @@ function drawFloaters() {
   }
 }
 
-// ===== HUD update =====
+// ===== HUD =====
 function updateHUD() {
   if (!ui.hudStage) return;
 
@@ -1792,18 +1966,16 @@ function updateHUD() {
   ui.hudCoins.textContent = `🪙 ${player.coins}`;
   ui.hudGems.textContent = `💎 ${player.gems}`;
 
-  // HP bar
   const hpP = player.hp / player.maxHp;
-  if (ui.hudHPText) ui.hudHPText.textContent = `${Math.floor(player.hp)}/${Math.floor(player.maxHp)}`;
-  if (ui.hudHPBar) ui.hudHPBar.style.width = `${Math.floor(clamp(hpP, 0, 1) * 100)}%`;
+  ui.hudHPText && (ui.hudHPText.textContent = `${Math.floor(player.hp)}/${Math.floor(player.maxHp)}`);
+  ui.hudHPBar && (ui.hudHPBar.style.width = `${Math.floor(clamp(hpP, 0, 1) * 100)}%`);
 
-  // XP bar
   const xpP = xp.cur / xp.need;
-  if (ui.hudXPText) ui.hudXPText.textContent = `LV ${xp.level} · ${xp.cur}/${xp.need}`;
-  if (ui.hudXPBar) ui.hudXPBar.style.width = `${Math.floor(clamp(xpP, 0, 1) * 100)}%`;
+  ui.hudXPText && (ui.hudXPText.textContent = `LV ${xp.level} · ${xp.cur}/${xp.need}`);
+  ui.hudXPBar && (ui.hudXPBar.style.width = `${Math.floor(clamp(xpP, 0, 1) * 100)}%`);
 }
 
-// ===== Main update loop =====
+// ===== Main loop =====
 let prev = performance.now();
 
 function tick(now) {
@@ -1831,42 +2003,59 @@ function tick(now) {
     pickupDrops(dt);
     cleanupDeadEnemies();
 
-    // win check
     if (levelWave.done) {
-      // stop gameplay and show summary
       finishLevelWin();
-      return requestAnimationFrame(tick);
+      requestAnimationFrame(tick);
+      return;
     }
 
-    // draw
     drawMapBackground();
-    // drops
     for (const d of drops) drawDrop(d);
-    // bullets
     for (const b of bullets) drawBullet(b);
-    // enemies
     for (const e of enemies) if (e.hp > 0) drawEnemy(e);
-    // hero
     drawHero();
-    // fx
     drawFx();
-    // floaters
     drawFloaters();
+
+    // danger overlay
+    if (dangerT > 0) {
+      dangerT -= dt;
+      const pulse = 0.12 + 0.10 * Math.sin(runTime * 12);
+      ctx.save();
+      ctx.globalAlpha = clamp(pulse * (dangerT / 10), 0, 0.22);
+      ctx.fillStyle = "#ef4444";
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+
+    // top banner
+    if (bannerT > 0) {
+      bannerT -= dt;
+      ctx.save();
+      ctx.globalAlpha = clamp(bannerT / 0.35, 0, 1);
+      ctx.fillStyle = "rgba(17,24,39,.88)";
+      const h = 34;
+      ctx.fillRect(0, 6, W, h);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "800 14px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(bannerText, W / 2, 6 + h / 2);
+      ctx.restore();
+    }
 
     updateHUD();
   } else if (state === STATE.MENU) {
-    // animated menu background
     world.camX = Math.sin(now / 1400) * 120;
     world.camY = Math.cos(now / 1700) * 120;
-    world.mapPalette = mapForStage(save.stage).palette;
-    world.mapName = mapForStage(save.stage).name;
-    drawMapBackground();
+    const m = mapForStage(save.stage);
+    world.mapPalette = m.palette;
+    world.mapName = m.name;
 
-    // preview hero
+    drawMapBackground();
     player.x = 0; player.y = 0;
     drawHero();
   } else {
-    // paused / levelup / shop / etc: still show last frame-ish
     drawMapBackground();
     for (const d of drops) drawDrop(d);
     for (const b of bullets) drawBullet(b);
@@ -1883,102 +2072,110 @@ requestAnimationFrame(tick);
 
 // ===== UI EVENTS =====
 ui.btnPlay?.addEventListener("click", () => startGame());
+
 ui.btnPause?.addEventListener("click", () => {
   if (state !== STATE.RUN) return;
-  if (ui.pauseTitle) ui.pauseTitle.textContent = "Пауза";
+  ui.pauseTitle && (ui.pauseTitle.textContent = "Пауза");
   setState(STATE.PAUSE);
 });
+
 ui.btnResume?.addEventListener("click", () => {
   if (ui.pauseTitle && ui.pauseTitle.textContent === "Поражение") {
-    // retry same level
     resetLevelRuntime();
     setState(STATE.RUN);
     return;
   }
   setState(STATE.RUN);
 });
+
 ui.btnToMenu?.addEventListener("click", () => {
   setState(STATE.MENU);
   updateMenuWallet();
 });
+
 ui.btnShop?.addEventListener("click", () => {
+  shopView = "home";
   renderShop();
   setState(STATE.SHOP);
 });
+
 ui.btnLoadout?.addEventListener("click", () => {
   renderLoadout();
   setState(STATE.LOADOUT);
 });
+
 ui.btnReset?.addEventListener("click", () => hardReset());
 
-ui.btnCloseShop?.addEventListener("click", () => { setState(STATE.MENU); updateMenuWallet(); });
-ui.btnCloseLoadout?.addEventListener("click", () => { setState(STATE.MENU); updateMenuWallet(); });
-
-ui.tabs?.forEach(t => {
-  t.addEventListener("click", () => {
-    ui.tabs.forEach(x => x.classList.remove("active"));
-    t.classList.add("active");
-    const tab = t.dataset.tab;
-    ui.shopMeta?.classList.toggle("hidden", tab !== "meta");
-    ui.shopWeapons?.classList.toggle("hidden", tab !== "weapons");
-    ui.shopCosmetics?.classList.toggle("hidden", tab !== "cosmetics");
-  });
+ui.btnCloseShop?.addEventListener("click", () => {
+  setState(STATE.MENU);
+  updateMenuWallet();
 });
 
-ui.dockShop?.addEventListener("click", () => { renderShop(); setState(STATE.SHOP); });
-ui.dockLoadout?.addEventListener("click", () => { renderLoadout(); setState(STATE.LOADOUT); });
+ui.btnCloseLoadout?.addEventListener("click", () => {
+  setState(STATE.MENU);
+  updateMenuWallet();
+});
+
+ui.dockShop?.addEventListener("click", () => {
+  shopView = "home";
+  renderShop();
+  setState(STATE.SHOP);
+});
+
+ui.dockLoadout?.addEventListener("click", () => {
+  renderLoadout();
+  setState(STATE.LOADOUT);
+});
+
 ui.dockSkills?.addEventListener("click", () => {
   const s = player.run;
   showToast(`Навыки: пилы ${s.sawLv} · гранаты ${s.grenadeLv} · молния ${s.lightningLv} · дрон ${s.droneLv} · щит ${s.shieldLv}`);
 });
-ui.dockQuit?.addEventListener("click", () => { setState(STATE.MENU); updateMenuWallet(); });
+
+ui.dockQuit?.addEventListener("click", () => {
+  setState(STATE.MENU);
+  updateMenuWallet();
+});
 
 ui.btnNext?.addEventListener("click", () => {
-  // after summary: if level just finished and it was stage completion (we advanced stage)
-  // detect: if we just finished level 5 -> we already advanced stage and set levelInStage=1
-  // show chest after stage advance
+  // если после победы по уровню 5 — мы уже увеличили stage и level=1, значит даём сундук
   if (save.levelInStage === 1) {
     stageCompleted();
   } else {
-    // next level start (skills reset each level)
     resetLevelRuntime();
     setState(STATE.RUN);
   }
 });
 
-// Chest logic
-let chestOpened = false;
-ui.chest?.addEventListener("click", () => {
+// Chest
+ui.chest?.addEventListener("click", async () => {
   if (chestOpened) return;
   chestOpened = true;
 
-  // random rewards
-  const roll = Math.random();
-  let msg = "";
-  if (roll < 0.65) {
-    const c = randi(250, 600) + save.stage * 40;
-    save.coins += c;
-    msg = `Сундук: +🪙 ${c}`;
-  } else if (roll < 0.90) {
-    const g = randi(2, 6);
-    save.gems += g;
-    msg = `Сундук: +💎 ${g}`;
-  } else {
-    // bonus meta upgrade (random)
-    const keys = ["hp", "dmg", "firerate", "movespeed", "magnet"];
-    const k = keys[randi(0, keys.length - 1)];
-    save.meta[k] = (save.meta[k] ?? 0) + 1;
-    msg = `Сундук: +мета прокачка (${k})`;
+  ui.chest && ui.chest.classList.add("opened");
+  ui.chestHint && (ui.chestHint.textContent = "🎰 Крутим...");
+  if (ui.btnChestContinue) {
+    ui.btnChestContinue.disabled = true;
+    ui.btnChestContinue.textContent = "Крутим...";
   }
 
+  const reward = chestRewardRoll();
+  await playChestRoulette(reward);
+
+  reward.apply();
   writeSave();
-  if (ui.chestHint) ui.chestHint.textContent = msg;
+
+  ui.chestHint && (ui.chestHint.textContent = `🎁 Выпало: ${reward.label}`);
   showToast("Сундук открыт 🎁", 1200);
+
+  if (ui.btnChestContinue) {
+    ui.btnChestContinue.disabled = false;
+    ui.btnChestContinue.textContent = "Продолжить";
+  }
 });
 
 ui.btnChestContinue?.addEventListener("click", () => {
   chestOpened = false;
-  // start new stage level 1
   resetLevelRuntime();
   setState(STATE.RUN);
 });
@@ -1987,7 +2184,7 @@ ui.btnChestContinue?.addEventListener("click", () => {
 setState(STATE.MENU);
 renderShop();
 
-// If your CSS uses custom roundRect not supported, ensure polyfill:
+// roundRect polyfill
 if (!CanvasRenderingContext2D.prototype.roundRect) {
   CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
     r = Math.min(r, w / 2, h / 2);
@@ -2000,4 +2197,4 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
     this.closePath();
     return this;
   };
-   }
+                                           }
