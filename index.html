@@ -1,173 +1,177 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
   <title>VOIDRUN: Survivor Arena</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
-  <canvas id="game"></canvas>
 
-  <!-- HUD -->
-  <div id="hud" class="hidden">
-    <div id="hudTop">
-      <div class="hudLeft">
-        <div class="hudChip" id="hudStage">Этап 1 · Уровень 1/5</div>
-        <div class="hudChip" id="hudMap">Карта: Поля</div>
-        <div class="hudChip" id="hudTime">00:00</div>
-      </div>
+<canvas id="game"></canvas>
 
-      <div class="hudRight">
-        <div class="hudChip" id="hudCoins">🪙 0</div>
-        <div class="hudChip" id="hudGems">💎 0</div>
-        <button class="hudBtn" id="btnPause">⏸</button>
-      </div>
+<!-- HUD (минимальный, не закрывает экран) -->
+<div id="hud" class="hud hidden">
+  <div class="hudTop">
+    <div class="hudChip" id="hudStage">Этап 1 · 1/5</div>
+    <div class="hudChip" id="hudMap">Поля</div>
+    <div class="hudChip" id="hudTime">00:00</div>
+    <button class="hudBtn" id="btnPause">⏸</button>
+  </div>
+
+  <div class="hudBars">
+    <div class="barRow">
+      <div class="barLabel">HP <span id="hudHPText">100/100</span></div>
+      <div class="bar"><div class="barFill hp" id="hudHPBar"></div></div>
     </div>
-
-    <div id="hudBars">
-      <div class="barWrap">
-        <div class="barLabel" id="hudHPText">HP 100/100</div>
-        <div class="barOuter"><div class="barInner hp" id="hudHPBar"></div></div>
-      </div>
-      <div class="barWrap">
-        <div class="barLabel" id="hudXPText">XP 0/10 · LV 1</div>
-        <div class="barOuter"><div class="barInner xp" id="hudXPBar"></div></div>
-      </div>
+    <div class="barRow">
+      <div class="barLabel">XP <span id="hudXPText">LV 1 · 0/10</span></div>
+      <div class="bar"><div class="barFill xp" id="hudXPBar"></div></div>
     </div>
   </div>
 
-  <!-- Joystick RIGHT -->
-  <div id="joyWrap" class="hidden">
-    <div id="joyBase">
-      <div id="joyKnob"></div>
+  <div class="hudWallet">
+    <div class="hudChip" id="hudCoins">🪙 0</div>
+    <div class="hudChip" id="hudGems">💎 0</div>
+  </div>
+
+  <!-- Баннер сверху под HUD на всю ширину -->
+  <div id="banner" class="banner hidden"></div>
+</div>
+
+<!-- Dockbar снизу (иконки) -->
+<div id="dock" class="dock hidden">
+  <button class="dockBtn" id="dockShop">🛒</button>
+  <button class="dockBtn" id="dockUpgrades">🧠</button>
+  <button class="dockBtn" id="dockLoadout">🎒</button>
+  <button class="dockBtn" id="dockQuit">🏠</button>
+</div>
+
+<!-- Joystick справа -->
+<div id="joyWrap" class="joyWrap hidden">
+  <div id="joyBase" class="joyBase">
+    <div id="joyKnob" class="joyKnob"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast hidden"></div>
+
+<!-- MENU -->
+<div id="screenMenu" class="screen">
+  <div class="panel">
+    <div class="title">VOIDRUN: Survivor Arena</div>
+    <div class="sub" id="menuProgress">Прогресс: Этап 1 · Уровень 1/5</div>
+
+    <div class="walletRow">
+      <div class="pill" id="menuCoins">🪙 0</div>
+      <div class="pill" id="menuGems">💎 0</div>
+    </div>
+
+    <button class="btn primary" id="btnPlay">Играть</button>
+    <button class="btn" id="btnShop">Магазин</button>
+    <button class="btn" id="btnLoadout">Снаряжение</button>
+    <button class="btn danger" id="btnReset">Сброс прогресса</button>
+
+    <div class="hint">
+      Управление: <b>джойстик справа</b>. Герой стреляет автоматически.
+      С врагов падает XP/монеты/гемы. При лвлапе выбирай 1 из 3.
+      <br/>Этап = 5 уровней, 5-й уровень — босс.
     </div>
   </div>
+</div>
 
-  <!-- Bottom dock -->
-  <div id="dock" class="hidden">
-    <button class="dockBtn" id="dockShop">🛒</button>
-    <button class="dockBtn" id="dockLoadout">🎽</button>
-    <button class="dockBtn" id="dockSkills">✨</button>
-    <button class="dockBtn" id="dockQuit">⏏</button>
+<!-- PAUSE -->
+<div id="screenPause" class="screen hidden">
+  <div class="panel">
+    <div class="title" id="pauseTitle">Пауза</div>
+    <button class="btn primary" id="btnResume">Продолжить</button>
+    <button class="btn" id="btnToMenu">В меню</button>
   </div>
+</div>
 
-  <!-- Screens -->
-  <div id="screenMenu" class="screen">
-    <div class="panel">
-      <div class="title">VOIDRUN</div>
-      <div class="subtitle">Survivor Arena</div>
+<!-- LEVEL UP -->
+<div id="screenLevelUp" class="screen hidden">
+  <div class="panel">
+    <div class="title">Новый уровень!</div>
+    <div class="sub">Выбери 1 улучшение</div>
+    <div id="upgradeGrid" class="grid"></div>
+  </div>
+</div>
 
-      <div class="menuRow">
-        <div class="chip" id="menuCoins">🪙 0</div>
-        <div class="chip" id="menuGems">💎 0</div>
-      </div>
-      <div class="menuRow">
-        <div class="chip wide" id="menuProgress">Прогресс: Этап 1 · Уровень 1/5</div>
-      </div>
+<!-- SUMMARY -->
+<div id="screenSummary" class="screen hidden">
+  <div class="panel">
+    <div class="title" id="sumTitle">Уровень пройден ✅</div>
+    <div class="sub" id="sumSub">Этап 1 · Уровень 1/5</div>
+    <div id="sumGrid" class="grid"></div>
+    <button class="btn primary" id="btnNext">Дальше</button>
+  </div>
+</div>
 
-      <div class="menuBtns">
-        <button class="btn primary" id="btnPlay">Играть</button>
-        <button class="btn" id="btnShop">Магазин</button>
-        <button class="btn" id="btnLoadout">Персонализация</button>
-        <button class="btn danger" id="btnReset">Сброс</button>
-      </div>
+<!-- CHEST -->
+<div id="screenChest" class="screen hidden">
+  <div class="panel">
+    <div class="rowBetween">
+      <div class="title">Сундук этапа</div>
+      <button class="iconBtn" id="btnChestClose">✕</button>
+    </div>
 
-      <div class="hint">
-        Управление: джойстик справа. Герой стреляет сам.
-        За XP выбираешь 1 из 3 навыков. Навыки сбрасываются после уровня.
+    <div class="sub">Нажми на сундук, чтобы открыть (рулетка)</div>
+
+    <div class="chestArea">
+      <button id="chest" class="chest">🎁</button>
+      <div id="chestHint" class="chestHint">Готово к открытию</div>
+    </div>
+
+    <button class="btn primary" id="btnChestContinue" disabled>Открой сундук</button>
+  </div>
+</div>
+
+<!-- SHOP -->
+<div id="screenShop" class="screen hidden">
+  <div class="panel">
+    <div class="rowBetween">
+      <div class="title">Магазин</div>
+      <button class="iconBtn" id="btnCloseShop">✕</button>
+    </div>
+
+    <div class="walletRow">
+      <div class="pill" id="shopCoins">🪙 0</div>
+      <div class="pill" id="shopGems">💎 0</div>
+    </div>
+
+    <!-- HOME categories (по центру) -->
+    <div id="shopHome" class="shopHome">
+      <button class="btn primary" id="catMeta">🔧 Прокачка</button>
+      <button class="btn primary" id="catWeapons">🔫 Оружие</button>
+      <button class="btn primary" id="catPets">🐾 Питомцы</button>
+      <button class="btn primary" id="catCosmetics">🎨 Косметика</button>
+    </div>
+
+    <!-- CATEGORY view -->
+    <div id="shopCategory" class="hidden">
+      <div class="rowBetween">
+        <button class="btn" id="btnShopBack">← Категории</button>
+        <div class="sub" id="shopTitle">Категория</div>
       </div>
+      <div id="shopList" class="grid"></div>
     </div>
   </div>
+</div>
 
-  <div id="screenPause" class="screen hidden">
-    <div class="panel">
-      <div class="title small" id="pauseTitle">Пауза</div>
-      <div class="menuBtns">
-        <button class="btn primary" id="btnResume">Продолжить</button>
-        <button class="btn" id="btnToMenu">В меню</button>
-      </div>
+<!-- LOADOUT -->
+<div id="screenLoadout" class="screen hidden">
+  <div class="panel">
+    <div class="rowBetween">
+      <div class="title">Снаряжение</div>
+      <button class="iconBtn" id="btnCloseLoadout">✕</button>
     </div>
+    <div class="sub">Выбор оружия/косметики/питомца</div>
+    <div id="loadoutGrid" class="grid"></div>
   </div>
+</div>
 
-  <div id="screenLevelUp" class="screen hidden">
-    <div class="panel wide">
-      <div class="title small">Выбери улучшение</div>
-      <div class="subtitle small">1 из 3 · уровни навыков растут</div>
-      <div id="upgradeGrid" class="grid"></div>
-    </div>
-  </div>
-
-  <div id="screenSummary" class="screen hidden">
-    <div class="panel wide">
-      <div class="title small" id="sumTitle">Уровень пройден</div>
-      <div class="subtitle small" id="sumSub">Статистика забега</div>
-      <div class="sumGrid" id="sumGrid"></div>
-      <div class="menuBtns">
-        <button class="btn primary" id="btnNext">Дальше</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="screenChest" class="screen hidden">
-    <div class="panel">
-      <div class="title small">Сундук этапа</div>
-      <div class="subtitle small">Открывай — выпадет награда</div>
-      <div class="chestBox" id="chestBox">
-        <div class="chest" id="chest">🎁</div>
-        <div class="chestHint" id="chestHint">Нажми, чтобы открыть</div>
-      </div>
-      <div class="menuBtns">
-        <button class="btn primary hidden" id="btnChestContinue">Продолжить</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="screenShop" class="screen hidden">
-    <div class="panel wide">
-      <div class="shopTop">
-        <div>
-          <div class="title small">Магазин</div>
-          <div class="subtitle small">Постоянные покупки (мета)</div>
-        </div>
-        <div class="shopWallet">
-          <div class="chip" id="shopCoins">🪙 0</div>
-          <div class="chip" id="shopGems">💎 0</div>
-          <button class="btn small" id="btnCloseShop">Закрыть</button>
-        </div>
-      </div>
-
-      <div class="tabs">
-        <button class="tab active" data-tab="meta">Прокачка</button>
-        <button class="tab" data-tab="weapons">Оружие</button>
-        <button class="tab" data-tab="cosmetics">Косметика</button>
-      </div>
-
-      <div class="shopPages">
-        <div id="shopMeta" class="shopPage"></div>
-        <div id="shopWeapons" class="shopPage hidden"></div>
-        <div id="shopCosmetics" class="shopPage hidden"></div>
-      </div>
-
-      <div class="hint small">Свайпай по карточкам влево/вправо — листается.</div>
-    </div>
-  </div>
-
-  <div id="screenLoadout" class="screen hidden">
-    <div class="panel wide">
-      <div class="shopTop">
-        <div>
-          <div class="title small">Персонализация</div>
-          <div class="subtitle small">Цвет + аура</div>
-        </div>
-        <button class="btn small" id="btnCloseLoadout">Закрыть</button>
-      </div>
-      <div id="loadoutGrid" class="grid"></div>
-    </div>
-  </div>
-
-  <div id="toast" class="toast hidden"></div>
-
-  <script src="game.js"></script>
+<script src="game.js"></script>
 </body>
-    </html>
+</html>
